@@ -33,24 +33,44 @@ function parseAmount(value: string): number {
   return Number.isFinite(n) && n >= 0 ? n : 0
 }
 
-export function SimulatorPage() {
-  const [format, setFormat] = useState<GameFormat>('cash')
-  const [numPlayers, setNumPlayers] = useState(6)
+const STREET_BY_BOARD: Street[] = ['preflop', 'preflop', 'preflop', 'flop', 'turn', 'river']
+
+/** A scenario to start from (e.g. a spot sent by the hand replayer). */
+export type InitialScenario = Partial<ScenarioInput>
+
+export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
+  const [format, setFormat] = useState<GameFormat>(initial?.format ?? 'cash')
+  const [numPlayers, setNumPlayers] = useState(initial?.num_players ?? 6)
   const [positions, setPositions] = useState<string[]>([])
-  const [heroPosition, setHeroPosition] = useState<string | null>('BTN')
-  const [villains, setVillains] = useState<VillainState[]>([newVillain('BB')])
-  const [heroSlots, setHeroSlots] = useState<Slot[]>([null, null])
-  const [boardSlots, setBoardSlots] = useState<Slot[]>([null, null, null, null, null])
-  const [street, setStreet] = useState<Street>('flop')
-  const [pot, setPot] = useState('6.5')
-  const [toCall, setToCall] = useState('0')
-  const [stack, setStack] = useState('100')
-  const [previousAction, setPreviousAction] = useState('')
-  const [situation, setSituation] = useState<string>('')
-  const [ante, setAnte] = useState('0')
-  const [bbAnte, setBbAnte] = useState('0')
-  const [stacksByPos, setStacksByPos] = useState<Record<string, string>>({})
-  const [payouts, setPayouts] = useState('')
+  const [heroPosition, setHeroPosition] = useState<string | null>(
+    initial ? (initial.hero_position ?? null) : 'BTN',
+  )
+  const [villains, setVillains] = useState<VillainState[]>(() =>
+    initial?.villains?.length
+      ? initial.villains.map((v) => ({
+          position: v.position,
+          range: v.range,
+          hand: toSlots(v.hand, 2),
+          dealHand: false,
+        }))
+      : [newVillain('BB')],
+  )
+  const [heroSlots, setHeroSlots] = useState<Slot[]>(() => toSlots(initial?.hero_hand, 2))
+  const [boardSlots, setBoardSlots] = useState<Slot[]>(() => toSlots(initial?.board, 5))
+  const [street, setStreet] = useState<Street>(
+    initial ? STREET_BY_BOARD[(initial.board ?? '').length / 2] ?? 'flop' : 'flop',
+  )
+  const [pot, setPot] = useState(String(initial?.pot_bb ?? 6.5))
+  const [toCall, setToCall] = useState(String(initial?.to_call_bb ?? 0))
+  const [stack, setStack] = useState(String(initial?.effective_stack_bb ?? 100))
+  const [previousAction, setPreviousAction] = useState(initial?.previous_action ?? '')
+  const [situation, setSituation] = useState<string>(initial?.situation ?? '')
+  const [ante, setAnte] = useState(String(initial?.ante_bb ?? 0))
+  const [bbAnte, setBbAnte] = useState(String(initial?.bb_ante_bb ?? 0))
+  const [stacksByPos, setStacksByPos] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(initial?.stacks_bb ?? {}).map(([k, v]) => [k, String(v)])),
+  )
+  const [payouts, setPayouts] = useState((initial?.payouts ?? []).join(', '))
   const [active, setActive] = useState<ActiveSlot | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)

@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     equity_iterations: int = 200_000
     equity_exact_limit: float = 3e7
 
+    # Hand histories: names used as Hero when a file does not say who the hero is.
+    hero_names: list[str] = []
+    # Stats: below this sample size a metric is flagged as insufficient.
+    stats_min_sample: int = 100
+
     # Recommendation: tournaments at or below this effective stack use push/fold Nash.
     pushfold_max_bb: float = 15.0
 

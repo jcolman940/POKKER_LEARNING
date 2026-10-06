@@ -12,6 +12,7 @@ dependencies = [
     "alembic>=1.13",
     "pokercore",
     "numpy>=2.0",
+    "python-multipart>=0.0.9",
 ]
 
 [dependency-groups]

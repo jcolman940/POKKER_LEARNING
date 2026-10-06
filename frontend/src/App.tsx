@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { fetchVersion, type VersionInfo } from './api/client'
+import { HistoryPage } from './history/HistoryPage'
+import { ReplayerView } from './history/ReplayerView'
 import { PushFoldPage } from './pushfold/PushFoldPage'
 import { ChartsPage } from './ranges/ChartsPage'
-import { SimulatorPage } from './simulator/SimulatorPage'
+import { type InitialScenario, SimulatorPage } from './simulator/SimulatorPage'
+import { StatsPage } from './stats/StatsPage'
 
 const SECTIONS = [
   { id: 'simulator', label: 'Simulador', phase: 2 },
@@ -14,7 +17,7 @@ const SECTIONS = [
   { id: 'trainer', label: 'Entrenador', phase: 6 },
 ] as const
 
-const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold'])
+const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold', 'history', 'stats', 'replayer'])
 
 type BackendStatus =
   | { state: 'loading' }
@@ -24,6 +27,8 @@ type BackendStatus =
 export default function App() {
   const [backend, setBackend] = useState<BackendStatus>({ state: 'loading' })
   const [section, setSection] = useState<string>('simulator')
+  const [handId, setHandId] = useState<number | null>(null)
+  const [spot, setSpot] = useState<{ key: number; scenario: InitialScenario } | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -66,7 +71,29 @@ export default function App() {
       </nav>
 
       <main>
-        {section === 'simulator' && <SimulatorPage />}
+        {section === 'simulator' && <SimulatorPage key={spot?.key ?? 0} initial={spot?.scenario} />}
+        {section === 'history' && (
+          <HistoryPage
+            onOpen={(id) => {
+              setHandId(id)
+              setSection('replayer')
+            }}
+          />
+        )}
+        {section === 'replayer' &&
+          (handId === null ? (
+            <p className="muted">Elegí una mano en Historiales para reproducirla.</p>
+          ) : (
+            <ReplayerView
+              handId={handId}
+              onBack={() => setSection('history')}
+              onAnalyze={(scenario) => {
+                setSpot({ key: Date.now(), scenario })
+                setSection('simulator')
+              }}
+            />
+          ))}
+        {section === 'stats' && <StatsPage />}
         {section === 'ranges' && <ChartsPage />}
         {section === 'pushfold' && <PushFoldPage />}
       </main>

@@ -81,6 +81,21 @@ del rango rival (contra todos los rivales en multiway).
 Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuente lo da), fuente
 (`chart` / `nash` / `solver` / `heuristic`), confianza (exacta / aproximada), explicación corta y avisos.
 
+## Historiales, estadísticas y replayer (fase 4, en curso)
+
+- **Importación** (`POST /api/imports`, pestaña *Historiales*): `.txt` y `.zip`, sala detectada por contenido
+  (un parser por sala en `backend/app/parsers/`), idempotente por (sala, id de mano), tolerante a errores
+  con reporte de archivo/mano/línea. **Los parsers de GGPoker y PokerStars se escriben contra archivos
+  reales de muestra**: hasta tenerlos, ninguna sala está soportada.
+- **Modelo normalizado** `HandRecord` (`backend/app/domain/hand.py`): lo producen los parsers y lo consumen
+  estadísticas, replayer y (fase 6) entrenador.
+- **Estadísticas** (`/api/stats`): VPIP, PFR, 3-bet, fold to 3-bet, c-bet flop/turn, fold to c-bet, WTSD, W$SD,
+  AF/AFq, winrate y winrate all-in EV (bb/100), con muestra, IC 95% y aviso de muestra insuficiente
+  (`POKER_STATS_MIN_SAMPLE`). Cortes por posición, mano, stack, mesa, formato y mes; gráfico de ganancias
+  (total / con showdown / sin showdown / all-in EV). Torneos: ROI, ITM y chip EV cuando hay resultados.
+- **Replayer** (`/api/hands/{id}/replay`): paso a paso con la equity de Hero contra los rangos asignados y
+  el botón *Analizar este spot*, que abre el simulador con el escenario armado.
+
 ## Configuración
 
 Centralizada en `backend/app/config.py`. Toda opción se puede sobreescribir con
@@ -92,6 +107,8 @@ variables `POKER_*` o un archivo `.env` en `backend/`:
 | `POKER_DATABASE_URL` | `sqlite:///<data_dir>/poker.sqlite3` | URL de la base |
 | `POKER_AUTO_MIGRATE` | `true` | Aplica migraciones al iniciar |
 | `POKER_PUSHFOLD_MAX_BB` | `15` | Stack efectivo máximo para usar push/fold en torneos |
+| `POKER_HERO_NAMES` | `[]` | Nombres a usar como Hero si el archivo no lo indica (JSON) |
+| `POKER_STATS_MIN_SAMPLE` | `100` | Muestra mínima antes de marcar una métrica como insuficiente |
 | `POKER_SOLVER_PATH` | — | Binario de TexasSolver (fase 5) |
 | `POKER_UPDATE_FEED_URL` | — | Canal de actualizaciones (fase 7) |
 

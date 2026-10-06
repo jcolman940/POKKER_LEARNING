@@ -23,3 +23,13 @@ def client(tmp_path, monkeypatch):
     get_settings.cache_clear()
     get_engine.cache_clear()
     _session_factory.cache_clear()
+
+
+@pytest.fixture
+def fake_room():
+    from app.parsers import register, unregister
+    from tests.fake_parser import FakeParser
+
+    register(FakeParser())
+    yield
+    unregister("fake")
