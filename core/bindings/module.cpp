@@ -8,6 +8,8 @@
 #include "pokercore/card.hpp"
 #include "pokercore/equity.hpp"
 #include "pokercore/evaluator.hpp"
+#include "pokercore/icm.hpp"
+#include "pokercore/preflop.hpp"
 #include "pokercore/range.hpp"
 #include "pokercore/version.hpp"
 
@@ -118,6 +120,20 @@ PYBIND11_MODULE(_core, m) {
       py::arg("hero"), py::arg("villain"), py::arg("board"), py::arg("dead") = "",
       "Showdown result of the hero hand vs a range on the current 3-5 card board, "
       "without dealing more cards.");
+
+  m.def("icm_equity", &icm_equity, py::arg("stacks"), py::arg("payouts"),
+        "Malmuth-Harville ICM: expected prize of each player (stacks <= 0 are eliminated). "
+        "Up to 12 players with chips.");
+
+  m.def(
+      "preflop_equity_matrix",
+      [](std::uint64_t trials_per_pair, std::uint64_t seed, int threads) {
+        py::gil_scoped_release release;
+        return preflop_equity_matrix(trials_per_pair, seed, threads);
+      },
+      py::arg("trials_per_pair"), py::arg("seed") = 1, py::arg("threads") = 0,
+      "Heads-up preflop all-in equity between the 169 hand classes, as a flat row-major "
+      "list (169 * 169) in 13x13 grid order.");
 
   py::class_<PlayerEquity>(m, "PlayerEquity")
       .def_readonly("equity", &PlayerEquity::equity)

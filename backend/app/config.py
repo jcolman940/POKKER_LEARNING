@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     equity_iterations: int = 200_000
     equity_exact_limit: float = 3e7
 
+    # Recommendation: tournaments at or below this effective stack use push/fold Nash.
+    pushfold_max_bb: float = 15.0
+
     # External postflop solver (TexasSolver console binary). Optional until phase 5.
     solver_path: Path | None = None
 

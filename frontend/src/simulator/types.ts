@@ -1,4 +1,4 @@
-export type GameFormat = 'cash' | 'mtt' | 'sng'
+export type GameFormat = 'cash' | 'mtt' | 'sng' | 'spin'
 export type Street = 'preflop' | 'flop' | 'turn' | 'river'
 
 export interface VillainInput {
@@ -18,6 +18,30 @@ export interface ScenarioInput {
   to_call_bb: number
   effective_stack_bb: number
   previous_action: string
+  situation: string | null
+  ante_bb: number
+  bb_ante_bb: number
+  stacks_bb: Record<string, number>
+  payouts: number[]
+}
+
+export interface RecommendedAction {
+  action: string
+  frequency: number
+  ev: number | null
+}
+
+export interface Recommendation {
+  available: boolean
+  message: string | null
+  source: 'chart' | 'nash' | 'solver' | 'heuristic' | null
+  confidence: 'exact' | 'approximate' | null
+  hand_class: string | null
+  actions: RecommendedAction[]
+  ev_unit: string | null
+  reference: string | null
+  explanation: string[]
+  warnings: string[]
 }
 
 export interface PlayerEquity {
@@ -58,7 +82,7 @@ export interface Analysis {
   outs: Outs
   metrics: Metrics
   ranges: { text: string; combos: number }[]
-  recommendation: { available: boolean; message: string }
+  recommendation: Recommendation
 }
 
 export interface DealRequest {

@@ -2,6 +2,8 @@ import pokercore
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.recommend.charts import normalize_range_text
+
 router = APIRouter(prefix="/ranges", tags=["ranges"])
 
 
@@ -18,12 +20,13 @@ class RangeParseOut(BaseModel):
 
 @router.post("/parse", response_model=RangeParseOut)
 def parse_range(body: RangeParseIn) -> RangeParseOut:
+    text = normalize_range_text(body.text)
     try:
-        combos = pokercore.range_combos(body.text)
+        combos = pokercore.range_combos(text)
     except ValueError as e:
         return RangeParseOut(valid=False, error=f"Rango inválido: {e}")
     return RangeParseOut(
         valid=True,
         combos=sum(w for _, w in combos),
-        grid=pokercore.range_grid(body.text),
+        grid=pokercore.range_grid(text),
     )

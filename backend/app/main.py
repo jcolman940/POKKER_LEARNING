@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import ranges, simulator, system
+from app.api import charts, pushfold, ranges, simulator, system
 from app.config import get_settings
 from app.db import run_migrations
 
@@ -28,6 +28,8 @@ def create_app() -> FastAPI:
     app.include_router(system.router, prefix=settings.api_prefix)
     app.include_router(simulator.router, prefix=settings.api_prefix)
     app.include_router(ranges.router, prefix=settings.api_prefix)
+    app.include_router(charts.router, prefix=settings.api_prefix)
+    app.include_router(pushfold.router, prefix=settings.api_prefix)
 
     # Domain and core errors (bad cards, empty ranges, impossible deals) are user input
     # problems: report them as 422 with a readable message.

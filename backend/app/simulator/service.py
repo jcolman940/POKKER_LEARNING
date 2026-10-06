@@ -3,11 +3,13 @@ from __future__ import annotations
 import random
 
 import pokercore
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.domain.cards import DECK, draw, ensure_disjoint, format_cards, parse_cards
 from app.domain.metrics import pot_metrics
 from app.domain.scenario import BOARD_SIZE, Scenario
+from app.recommend.engine import recommend
 from app.simulator.schemas import (
     AnalysisOut,
     DealOut,
@@ -81,7 +83,7 @@ def compute_outs(hero: str, villain_ranges: list[str], board: str) -> OutsOut:
     )
 
 
-def analyze(scenario: Scenario) -> AnalysisOut:
+def analyze(scenario: Scenario, session: Session) -> AnalysisOut:
     ranges = [v.range for v in scenario.villains]
     dead = scenario.hero_hand + scenario.board
     range_info = [
@@ -108,6 +110,7 @@ def analyze(scenario: Scenario) -> AnalysisOut:
         outs=compute_outs(scenario.hero_hand, ranges, scenario.board),
         metrics=MetricsOut(**metrics.__dict__),
         ranges=range_info,
+        recommendation=recommend(scenario, session),
     )
 
 

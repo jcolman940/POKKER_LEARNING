@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.domain.scenario import Street
+from app.recommend.schemas import RecommendationOut
 
 
 class PlayerEquityOut(BaseModel):
@@ -41,11 +42,6 @@ class RangeInfoOut(BaseModel):
     combos: float  # weighted live combos after removing hero and board cards
 
 
-class RecommendationOut(BaseModel):
-    available: bool = False
-    message: str = "El motor de recomendación llega en la fase 3."
-
-
 class AnalysisOut(BaseModel):
     street: Street
     equity: EquityOut
@@ -54,7 +50,7 @@ class AnalysisOut(BaseModel):
     outs: OutsOut
     metrics: MetricsOut
     ranges: list[RangeInfoOut]
-    recommendation: RecommendationOut = RecommendationOut()
+    recommendation: RecommendationOut
 
 
 class DealRequest(BaseModel):

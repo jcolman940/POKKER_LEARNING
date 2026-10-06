@@ -1,5 +1,6 @@
 import { CardView } from './CardView'
 import { num, pct } from './format'
+import { RecommendationPanel } from './RecommendationPanel'
 import type { Analysis, EquityResult } from './types'
 
 const STREET_LABEL = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' }
@@ -139,10 +140,7 @@ export function ResultsPanel({
         )}
       </section>
 
-      <section className="panel panel-muted" aria-labelledby="rec-title">
-        <h3 id="rec-title">Recomendación</h3>
-        <p className="muted">{recommendation.message}</p>
-      </section>
+      <RecommendationPanel rec={recommendation} />
     </div>
   )
 }

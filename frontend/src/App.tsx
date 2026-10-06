@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
 import { fetchVersion, type VersionInfo } from './api/client'
+import { PushFoldPage } from './pushfold/PushFoldPage'
+import { ChartsPage } from './ranges/ChartsPage'
 import { SimulatorPage } from './simulator/SimulatorPage'
 
 const SECTIONS = [
   { id: 'simulator', label: 'Simulador', phase: 2 },
   { id: 'ranges', label: 'Rangos preflop', phase: 3 },
+  { id: 'pushfold', label: 'Push/fold', phase: 3 },
   { id: 'history', label: 'Historiales', phase: 4 },
   { id: 'stats', label: 'Estadísticas', phase: 4 },
   { id: 'replayer', label: 'Replayer', phase: 4 },
   { id: 'trainer', label: 'Entrenador', phase: 6 },
 ] as const
 
-const AVAILABLE = new Set<string>(['simulator'])
+const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold'])
 
 type BackendStatus =
   | { state: 'loading' }
@@ -62,7 +65,11 @@ export default function App() {
         })}
       </nav>
 
-      <main>{section === 'simulator' && <SimulatorPage />}</main>
+      <main>
+        {section === 'simulator' && <SimulatorPage />}
+        {section === 'ranges' && <ChartsPage />}
+        {section === 'pushfold' && <PushFoldPage />}
+      </main>
 
       <footer className="app-footer">
         <span>Versión {__APP_VERSION__}</span>

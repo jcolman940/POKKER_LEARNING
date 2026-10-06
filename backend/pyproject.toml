@@ -11,6 +11,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "pokercore",
+    "numpy>=2.0",
 ]
 
 [dependency-groups]

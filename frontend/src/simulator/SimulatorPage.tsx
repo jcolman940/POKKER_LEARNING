@@ -4,6 +4,7 @@ import { CardPicker } from './CardPicker'
 import { CardView } from './CardView'
 import { RangeEditor } from './RangeEditor'
 import { ResultsPanel } from './ResultsPanel'
+import { SITUATIONS } from '../ranges/labels'
 import { joinSlots, type Slot, toSlots } from './cards'
 import type { Analysis, DealRequest, DealResult, GameFormat, ScenarioInput, Street } from './types'
 
@@ -45,6 +46,11 @@ export function SimulatorPage() {
   const [toCall, setToCall] = useState('0')
   const [stack, setStack] = useState('100')
   const [previousAction, setPreviousAction] = useState('')
+  const [situation, setSituation] = useState<string>('')
+  const [ante, setAnte] = useState('0')
+  const [bbAnte, setBbAnte] = useState('0')
+  const [stacksByPos, setStacksByPos] = useState<Record<string, string>>({})
+  const [payouts, setPayouts] = useState('')
   const [active, setActive] = useState<ActiveSlot | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -134,6 +140,13 @@ export function SimulatorPage() {
     }
   }
 
+  const isTournament = format !== 'cash'
+  const payoutList = payouts
+    .split(/[,;\s]+/)
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n >= 0)
+
   async function analyze() {
     setError(null)
     const heroHand = joinSlots(heroSlots)
@@ -156,6 +169,17 @@ export function SimulatorPage() {
       to_call_bb: parseAmount(toCall),
       effective_stack_bb: parseAmount(stack),
       previous_action: previousAction,
+      situation: situation || null,
+      ante_bb: parseAmount(ante),
+      bb_ante_bb: parseAmount(bbAnte),
+      stacks_bb: isTournament
+        ? Object.fromEntries(
+            Object.entries(stacksByPos)
+              .filter(([p, v]) => positions.includes(p) && v.trim() !== '')
+              .map(([p, v]) => [p, parseAmount(v)]),
+          )
+        : {},
+      payouts: isTournament ? payoutList : [],
     }
     setBusy(true)
     try {
@@ -193,6 +217,7 @@ export function SimulatorPage() {
                 <option value="cash">Cash</option>
                 <option value="mtt">Torneo (MTT)</option>
                 <option value="sng">Sit &amp; Go</option>
+                <option value="spin">Spin &amp; Go</option>
               </select>
             </label>
             <label>
@@ -221,6 +246,57 @@ export function SimulatorPage() {
             </label>
           </div>
           <p className="muted small">El pote incluye la apuesta que estás enfrentando.</p>
+          <div className="field-row">
+            <label>
+              Situación preflop
+              <select value={situation} onChange={(e) => setSituation(e.target.value)}>
+                <option value="">Sin definir</option>
+                {SITUATIONS.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Ante (bb)
+              <input type="number" min="0" step="0.01" value={ante} onChange={(e) => setAnte(e.target.value)} />
+            </label>
+            <label>
+              BB ante (bb)
+              <input type="number" min="0" step="0.1" value={bbAnte} onChange={(e) => setBbAnte(e.target.value)} />
+            </label>
+          </div>
+          <p className="muted small">Rival 1 es quien abrió, subió o fue all-in antes que vos.</p>
+          {isTournament && (
+            <details className="tournament">
+              <summary>Torneo: stacks por posición y premios (ICM)</summary>
+              <div className="stack-grid">
+                {positions.map((p) => (
+                  <label key={p}>
+                    {p}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder={stack}
+                      value={stacksByPos[p] ?? ''}
+                      onChange={(e) => setStacksByPos((s) => ({ ...s, [p]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <label>
+                Premios que quedan (vacío = chip EV)
+                <input
+                  type="text"
+                  value={payouts}
+                  onChange={(e) => setPayouts(e.target.value)}
+                  placeholder="Ej.: 50, 30, 20"
+                />
+              </label>
+            </details>
+          )}
           <label>
             Acción previa
             <input

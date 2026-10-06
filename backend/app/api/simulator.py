@@ -1,5 +1,9 @@
-from fastapi import APIRouter
+from typing import Annotated
 
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.db import get_session
 from app.domain.positions import position_names
 from app.domain.scenario import Scenario
 from app.simulator import service
@@ -9,8 +13,8 @@ router = APIRouter(prefix="/simulator", tags=["simulator"])
 
 
 @router.post("/analyze", response_model=AnalysisOut)
-def analyze(scenario: Scenario) -> AnalysisOut:
-    return service.analyze(scenario)
+def analyze(scenario: Scenario, session: Annotated[Session, Depends(get_session)]) -> AnalysisOut:
+    return service.analyze(scenario, session)
 
 
 @router.post("/deal", response_model=DealOut)

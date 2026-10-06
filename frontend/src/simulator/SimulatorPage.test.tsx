@@ -24,7 +24,21 @@ const ANALYSIS: Analysis = {
   outs: { available: true, currently_ahead: true, hero_share: 0.67, cards: [], count: 0, unseen: 44 },
   metrics: { pot_odds: 2, required_equity: 1 / 3, mdf: 0.5, spr: 4 },
   ranges: [{ text: 'KK,QQ', combos: 9 }],
-  recommendation: { available: false, message: 'El motor de recomendación llega en la fase 3.' },
+  recommendation: {
+    available: true,
+    message: null,
+    source: 'chart',
+    confidence: 'approximate',
+    hand_class: 'AA',
+    actions: [
+      { action: 'raise', frequency: 0.75, ev: null },
+      { action: 'fold', frequency: 0.25, ev: null },
+    ],
+    ev_unit: null,
+    reference: 'Fuente externa: Pokalab · BTN RFI',
+    explanation: ['Valor: la mano está en la mitad fuerte de tu rango de raise.'],
+    warnings: ['Stack del rango: 100bb (escenario: 40bb)'],
+  },
 }
 
 function baseRoutes(extra: Parameters<typeof mockApi>[0] = {}) {
@@ -76,7 +90,9 @@ describe('SimulatorPage', () => {
     expect(await screen.findByText('70.0%', { selector: '.big-number' })).toBeInTheDocument()
     expect(screen.getByText(/Contra esta mano puntual tenías/)).toHaveTextContent('4.5%')
     expect(screen.getByText('2.0 : 1')).toBeInTheDocument()
-    expect(screen.getByText('El motor de recomendación llega en la fase 3.')).toBeInTheDocument()
+    expect(screen.getByText('Aproximado')).toBeInTheDocument()
+    expect(screen.getByText('Fuente externa: Pokalab · BTN RFI')).toBeInTheDocument()
+    expect(screen.getByText('Stack del rango: 100bb (escenario: 40bb)')).toBeInTheDocument()
 
     const analyzeCall = fetchMock.mock.calls.find(([url]) => String(url) === '/api/simulator/analyze')
     const sent = JSON.parse(String(analyzeCall?.[1]?.body))

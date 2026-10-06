@@ -16,6 +16,20 @@ class GameFormat(StrEnum):
     CASH = "cash"
     MTT = "mtt"
     SNG = "sng"
+    SPIN = "spin"
+
+
+TOURNAMENT_FORMATS = {GameFormat.MTT, GameFormat.SNG, GameFormat.SPIN}
+
+
+class Situation(StrEnum):
+    RFI = "rfi"  # folded to hero
+    VS_OPEN = "vs_open"
+    VS_3BET = "vs_3bet"
+    VS_4BET = "vs_4bet"
+    SQUEEZE = "squeeze"
+    BVB = "bvb"  # blind vs blind
+    VS_ALLIN = "vs_allin"
 
 
 class Street(StrEnum):
@@ -50,6 +64,15 @@ class Scenario(BaseModel):
     to_call_bb: Amount = 0.0
     effective_stack_bb: Amount = 100.0
     previous_action: str = ""
+    # Preflop context for the recommendation engine. Villain 1 is the player who
+    # opened / raised / shoved when the situation involves a rival.
+    situation: Situation | None = None
+    ante_bb: Amount = 0.0  # per player
+    bb_ante_bb: Amount = 0.0  # big blind ante (paid by the BB)
+    # Tournaments: stacks by position (defaults to the effective stack) and the
+    # remaining payouts for ICM (empty = chip EV).
+    stacks_bb: dict[str, float] = Field(default_factory=dict)
+    payouts: list[Annotated[float, Field(ge=0)]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate(self) -> Scenario:
@@ -98,6 +121,12 @@ class Scenario(BaseModel):
                 raise ValueError(f"Posición {p} no existe en una mesa de {self.num_players}")
         if len(given) != len(set(given)):
             raise ValueError("Dos jugadores no pueden ocupar la misma posición")
+
+        for pos, stack in self.stacks_bb.items():
+            if pos not in valid_positions:
+                raise ValueError(f"Posición {pos} no existe en una mesa de {self.num_players}")
+            if stack <= 0:
+                raise ValueError("Los stacks deben ser positivos")
 
         if self.to_call_bb > self.pot_bb:
             raise ValueError(

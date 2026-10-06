@@ -65,6 +65,22 @@ Convenciones: el pote incluye la apuesta que enfrenta Hero; MDF asume que Hero n
 SPR = stack efectivo / pote. Un *out* es una carta que pone a Hero por delante de al menos la mitad
 del rango rival (contra todos los rivales en multiway).
 
+## Recomendación preflop (fase 3)
+
+- **Tablas** (`/api/charts`): rangos por formato, mesa, posición, stack y situación, editables desde
+  *Rangos preflop* (matriz 13×13 con frecuencias mixtas, notación, `.txt` de PioViewer, import/export JSON;
+  ver `data/ranges/README.md`). Si el escenario no coincide, se usa el rango más cercano marcado como
+  *aproximado* y se listan las diferencias.
+- **Push/fold Nash + ICM** (`/api/pushfold/solve`, pestaña *Push/fold*): mesa completa de 2 a 10 jugadores,
+  fictitious play sobre las 169 manos, ICM Malmuth-Harville con los premios que se cargan a mano (vacío =
+  chip EV). Modelo con un solo caller (sin overcalls). En el simulador se usa en torneos con stack efectivo
+  ≤ `POKER_PUSHFOLD_MAX_BB` (15bb por defecto) y situación RFI o vs all-in.
+- La equity preflop clase vs clase sale de `data/precomputed/preflop_equity_169.npy`
+  (Monte Carlo, 100k manos por par; regenerable con `scripts/gen_preflop_equity.py`).
+
+Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuente lo da), fuente
+(`chart` / `nash` / `solver` / `heuristic`), confianza (exacta / aproximada), explicación corta y avisos.
+
 ## Configuración
 
 Centralizada en `backend/app/config.py`. Toda opción se puede sobreescribir con
@@ -75,6 +91,7 @@ variables `POKER_*` o un archivo `.env` en `backend/`:
 | `POKER_DATA_DIR` | `./var` | Carpeta de datos locales (SQLite) |
 | `POKER_DATABASE_URL` | `sqlite:///<data_dir>/poker.sqlite3` | URL de la base |
 | `POKER_AUTO_MIGRATE` | `true` | Aplica migraciones al iniciar |
+| `POKER_PUSHFOLD_MAX_BB` | `15` | Stack efectivo máximo para usar push/fold en torneos |
 | `POKER_SOLVER_PATH` | — | Binario de TexasSolver (fase 5) |
 | `POKER_UPDATE_FEED_URL` | — | Canal de actualizaciones (fase 7) |
 

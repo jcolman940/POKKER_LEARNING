@@ -28,9 +28,14 @@ add_library(pokercore STATIC
   src/card.cpp
   src/equity.cpp
   src/evaluator.cpp
+  src/icm.cpp
+  src/preflop.cpp
   src/range.cpp
   src/version.cpp
 )
+find_package(Threads REQUIRED)
+target_link_libraries(pokercore PUBLIC Threads::Threads)
+
 target_include_directories(pokercore
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -57,6 +62,8 @@ if(POKERCORE_BUILD_TESTS)
     tests/test_card.cpp
     tests/test_equity.cpp
     tests/test_evaluator.cpp
+    tests/test_icm.cpp
+    tests/test_preflop.cpp
     tests/test_range.cpp
     tests/test_version.cpp
   )

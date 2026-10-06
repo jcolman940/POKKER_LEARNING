@@ -21,7 +21,7 @@ function errorMessage(body: unknown, status: number): string {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, init)
-  const body: unknown = await resp.json().catch(() => null)
+  const body: unknown = resp.status === 204 ? null : await resp.json().catch(() => null)
   if (!resp.ok) throw new ApiError(errorMessage(body, resp.status))
   return body as T
 }
@@ -37,6 +37,18 @@ export function postJson<T>(path: string, payload: unknown, signal?: AbortSignal
     body: JSON.stringify(payload),
     signal,
   })
+}
+
+export function putJson<T>(path: string, payload: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteJson(path: string): Promise<null> {
+  return request<null>(path, { method: 'DELETE' })
 }
 
 export function fetchVersion(signal?: AbortSignal): Promise<VersionInfo> {
