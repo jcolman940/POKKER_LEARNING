@@ -18,18 +18,39 @@ VERSION      versión de la app (única fuente de verdad)
 
 ## Requisitos
 
-- CMake ≥ 3.20, compilador C++20 (GCC 13 / Clang 16 / MSVC 2022), Ninja
+Plataforma objetivo: **Windows** (CI en `windows-latest` con MSVC). En Linux/macOS también compila.
+
+- Visual Studio 2022 con "Desarrollo para el escritorio con C++" (MSVC) y CMake ≥ 3.20
 - Python 3.12 + [uv](https://docs.astral.sh/uv/)
 - Node.js ≥ 20
 
-## Uso
+## Uso (Windows, PowerShell)
 
-```bash
-make setup     # instala dependencias (uv compila el núcleo C++ como paquete Python)
-make dev       # backend en :8000 y frontend en :5173
-make test      # core (ctest) + backend (ruff, pytest) + frontend (tsc, oxlint, vitest) + integración
-make migrate   # aplica migraciones Alembic
+```powershell
+cd backend; uv sync; cd ..      # instala dependencias y compila el núcleo C++ como paquete Python
+cd frontend; npm install; cd ..
+scripts\dev.ps1                  # backend en :8000 y frontend en :5173
+scripts\test.ps1                 # core (ctest) + backend (ruff, pytest) + frontend (tsc, oxlint, vitest) + integración
+scripts\test.ps1 core backend    # solo algunas suites
+scripts\bench.ps1                # benchmark del evaluador y de equity
 ```
+
+En Linux/macOS: `make setup | dev | test | bench | migrate` (usa `scripts/*.sh`).
+
+## Núcleo (`pokercore`)
+
+```python
+import pokercore
+
+pokercore.evaluate("AsKsQsJsTs2c3d")             # valor comparable (mayor = mejor)
+pokercore.range_combos("22+, A2s+, AKo:0.5", dead="Ah")
+r = pokercore.equity(["AA", "KK"])                # mano o rango por jugador, 2 a 10 jugadores
+r.players[0].equity, r.players[0].std_error, r.exact
+pokercore.equity(["QQ+,AKs", "random", "T9s"], "Td7c2h", mode="monte_carlo", iterations=100_000, seed=1)
+```
+
+Notación de rangos: `AA`, `AKs`, `AKo`, `AK`, `22+`, `A2s+`, `KTo+`, `99-55`, `A5s-A2s`, `T9s-65s`,
+combos puntuales (`AhKh`), `random`, y pesos estilo PioViewer (`AA:1.0,AKs:0.5`).
 
 ## Configuración
 

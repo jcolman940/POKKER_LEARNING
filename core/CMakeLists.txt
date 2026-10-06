@@ -13,16 +13,22 @@ endif()
 
 option(POKERCORE_BUILD_TESTS "Build C++ unit tests" ON)
 option(POKERCORE_BUILD_PYTHON "Build pybind11 Python module" OFF)
+option(POKERCORE_BUILD_BENCH "Build the performance benchmark" ON)
 
 # When built through scikit-build-core, default to the Python module only.
 if(SKBUILD)
   set(POKERCORE_BUILD_PYTHON ON)
   set(POKERCORE_BUILD_TESTS OFF)
+  set(POKERCORE_BUILD_BENCH OFF)
 endif()
 
 configure_file(src/version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/pokercore/version_info.hpp @ONLY)
 
 add_library(pokercore STATIC
+  src/card.cpp
+  src/equity.cpp
+  src/evaluator.cpp
+  src/range.cpp
   src/version.cpp
 )
 target_include_directories(pokercore
@@ -48,6 +54,10 @@ if(POKERCORE_BUILD_TESTS)
 
   enable_testing()
   add_executable(pokercore_tests
+    tests/test_card.cpp
+    tests/test_equity.cpp
+    tests/test_evaluator.cpp
+    tests/test_range.cpp
     tests/test_version.cpp
   )
   target_link_libraries(pokercore_tests PRIVATE pokercore Catch2::Catch2WithMain)
@@ -55,6 +65,11 @@ if(POKERCORE_BUILD_TESTS)
   list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
   include(Catch)
   catch_discover_tests(pokercore_tests)
+endif()
+
+if(POKERCORE_BUILD_BENCH)
+  add_executable(pokercore_bench bench/bench_main.cpp)
+  target_link_libraries(pokercore_bench PRIVATE pokercore)
 endif()
 
 if(POKERCORE_BUILD_PYTHON)

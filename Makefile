@@ -1,4 +1,4 @@
-.PHONY: setup dev test test-core test-backend test-frontend test-integration migrate
+.PHONY: setup dev bench test test-core test-backend test-frontend test-integration migrate
 
 setup:
 	cd backend && uv sync
@@ -6,6 +6,9 @@ setup:
 
 dev:
 	scripts/dev.sh
+
+bench:
+	scripts/bench.sh
 
 test:
 	scripts/test.sh

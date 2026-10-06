@@ -13,3 +13,14 @@ minimum-version = "0.10"
 cmake.version = ">=3.20"
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["python/pokercore"]
+
+[tool.uv]
+# Rebuild the extension whenever native sources change.
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "CMakeLists.txt" },
+    { file = "include/**/*.hpp" },
+    { file = "src/**/*" },
+    { file = "bindings/**/*.cpp" },
+    { file = "python/**/*" },
+]
