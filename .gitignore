@@ -1,0 +1,31 @@
+# Build outputs
+build/
+dist/
+*.egg-info/
+core/build/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Local data
+*.sqlite
+*.sqlite3
+*.db
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local app data
+var/
