@@ -54,4 +54,17 @@ struct EquityResult {
 EquityResult calculate_equity(const std::vector<Range>& players, const std::vector<Card>& board,
                               const std::vector<Card>& dead = {}, const EquityOptions& options = {});
 
+// Showdown result of a fixed hand against a range on the current board (3 to 5
+// cards), without dealing further cards. Fractions are weighted by combo weight
+// over the villain combos not blocked by the hero, board or dead cards.
+struct HandStrength {
+  double win = 0.0;
+  double tie = 0.0;
+  double lose = 0.0;
+  double combos = 0.0;  // weighted number of live villain combos
+};
+
+HandStrength hand_strength(Combo hero, const Range& villain, const std::vector<Card>& board,
+                           const std::vector<Card>& dead = {});
+
 }  // namespace pokercore

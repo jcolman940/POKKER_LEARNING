@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchVersion, type VersionInfo } from './api/client'
+import { SimulatorPage } from './simulator/SimulatorPage'
 
 const SECTIONS = [
   { id: 'simulator', label: 'Simulador', phase: 2 },
@@ -10,6 +11,8 @@ const SECTIONS = [
   { id: 'trainer', label: 'Entrenador', phase: 6 },
 ] as const
 
+const AVAILABLE = new Set<string>(['simulator'])
+
 type BackendStatus =
   | { state: 'loading' }
   | { state: 'ok'; info: VersionInfo }
@@ -17,6 +20,7 @@ type BackendStatus =
 
 export default function App() {
   const [backend, setBackend] = useState<BackendStatus>({ state: 'loading' })
+  const [section, setSection] = useState<string>('simulator')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -38,14 +42,27 @@ export default function App() {
         <p className="subtitle">Herramienta de estudio post-sesión. Sin asistencia en tiempo real.</p>
       </header>
 
-      <nav className="sections" aria-label="Secciones">
-        {SECTIONS.map((s) => (
-          <div key={s.id} className="section-card" aria-disabled="true">
-            <span className="section-label">{s.label}</span>
-            <span className="section-phase">Próximamente (fase {s.phase})</span>
-          </div>
-        ))}
+      <nav className="tabs" aria-label="Secciones">
+        {SECTIONS.map((s) => {
+          const available = AVAILABLE.has(s.id)
+          return (
+            <button
+              key={s.id}
+              type="button"
+              className={`tab${section === s.id ? ' tab-active' : ''}`}
+              aria-current={section === s.id ? 'page' : undefined}
+              disabled={!available}
+              title={available ? undefined : `Próximamente (fase ${s.phase})`}
+              onClick={() => setSection(s.id)}
+            >
+              {s.label}
+              {!available && <span className="tab-phase">fase {s.phase}</span>}
+            </button>
+          )
+        })}
       </nav>
+
+      <main>{section === 'simulator' && <SimulatorPage />}</main>
 
       <footer className="app-footer">
         <span>Versión {__APP_VERSION__}</span>

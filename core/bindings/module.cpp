@@ -77,6 +77,48 @@ PYBIND11_MODULE(_core, m) {
       "Expands range notation ('22+, A2s+, AKo:0.5, AhKh') into weighted combos, "
       "removing combos blocked by `dead` cards.");
 
+  m.def(
+      "range_grid",
+      [](const std::string& text) {
+        const Range r = Range::parse(text);
+        std::vector<double> grid(kNumHandClasses);
+        for (int i = 0; i < kNumHandClasses; ++i) grid[i] = r.class_weight(hand_class_from_index(i));
+        return grid;
+      },
+      py::arg("text"),
+      "Average weight of each of the 169 hand classes, in 13x13 grid order (row by row, "
+      "aces first; suited above the diagonal).");
+
+  m.def(
+      "hand_class_names",
+      [] {
+        std::vector<std::string> names;
+        for (int i = 0; i < kNumHandClasses; ++i) {
+          names.push_back(hand_class_to_string(hand_class_from_index(i)));
+        }
+        return names;
+      },
+      "Names of the 169 hand classes in 13x13 grid order ('AA', 'AKs', ..., '22').");
+
+  py::class_<HandStrength>(m, "HandStrength")
+      .def_readonly("win", &HandStrength::win)
+      .def_readonly("tie", &HandStrength::tie)
+      .def_readonly("lose", &HandStrength::lose)
+      .def_readonly("combos", &HandStrength::combos);
+
+  m.def(
+      "hand_strength",
+      [](const std::string& hero, const std::string& villain, const std::string& board,
+         const std::string& dead) {
+        const auto hero_cards = parse_cards(hero);
+        if (hero_cards.size() != 2) throw std::invalid_argument("hero must hold exactly 2 cards");
+        return hand_strength(make_combo(hero_cards[0], hero_cards[1]), Range::parse(villain),
+                             parse_cards(board), parse_cards(dead));
+      },
+      py::arg("hero"), py::arg("villain"), py::arg("board"), py::arg("dead") = "",
+      "Showdown result of the hero hand vs a range on the current 3-5 card board, "
+      "without dealing more cards.");
+
   py::class_<PlayerEquity>(m, "PlayerEquity")
       .def_readonly("equity", &PlayerEquity::equity)
       .def_readonly("win", &PlayerEquity::win)

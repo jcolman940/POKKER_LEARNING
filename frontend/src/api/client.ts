@@ -3,10 +3,42 @@ export interface VersionInfo {
   core: string
 }
 
-export async function fetchVersion(signal?: AbortSignal): Promise<VersionInfo> {
-  const resp = await fetch('/api/version', { signal })
-  if (!resp.ok) {
-    throw new Error(`HTTP ${resp.status}`)
+export class ApiError extends Error {}
+
+// FastAPI reports errors as {detail: string} or, for validation errors,
+// {detail: [{msg: string, ...}]}.
+function errorMessage(body: unknown, status: number): string {
+  const detail = (body as { detail?: unknown } | null)?.detail
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((d) => String((d as { msg?: unknown }).msg ?? ''))
+      .map((m) => m.replace(/^Value error, /, ''))
+      .join('. ')
   }
-  return (await resp.json()) as VersionInfo
+  return `Error del servidor (HTTP ${status})`
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const resp = await fetch(path, init)
+  const body: unknown = await resp.json().catch(() => null)
+  if (!resp.ok) throw new ApiError(errorMessage(body, resp.status))
+  return body as T
+}
+
+export function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, { signal })
+}
+
+export function postJson<T>(path: string, payload: unknown, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal,
+  })
+}
+
+export function fetchVersion(signal?: AbortSignal): Promise<VersionInfo> {
+  return getJson<VersionInfo>('/api/version', signal)
 }

@@ -52,6 +52,19 @@ pokercore.equity(["QQ+,AKs", "random", "T9s"], "Td7c2h", mode="monte_carlo", ite
 Notación de rangos: `AA`, `AKs`, `AKo`, `AK`, `22+`, `A2s+`, `KTo+`, `99-55`, `A5s-A2s`, `T9s-65s`,
 combos puntuales (`AhKh`), `random`, y pesos estilo PioViewer (`AA:1.0,AKs:0.5`).
 
+## Simulador (`/api/simulator`)
+
+- `POST /api/simulator/analyze`: recibe un `Scenario` y devuelve equity **contra el rango** de cada rival
+  (exacta o Monte Carlo con error estándar), outs, pot odds, equity requerida, MDF y SPR.
+  Si se fija la mano puntual de un rival, esa equity sale aparte en `equity_vs_hands` (solo informativa).
+- `POST /api/simulator/deal`: completa al azar las cartas que falten (Hero, board hasta la calle pedida,
+  manos de rivales opcionales) respetando las fijadas.
+- `GET /api/simulator/positions/{n}` y `POST /api/ranges/parse` (validación + grilla 13×13).
+
+Convenciones: el pote incluye la apuesta que enfrenta Hero; MDF asume que Hero no invirtió antes en la calle;
+SPR = stack efectivo / pote. Un *out* es una carta que pone a Hero por delante de al menos la mitad
+del rango rival (contra todos los rivales en multiway).
+
 ## Configuración
 
 Centralizada en `backend/app/config.py`. Toda opción se puede sobreescribir con

@@ -44,3 +44,19 @@ def test_equity_errors():
         pokercore.equity(["AA", "KK"], mode="fast")
     with pytest.raises(RuntimeError):
         pokercore.equity(["AhKh", "AhQd"], mode="exact")
+
+
+def test_range_grid_and_names():
+    names = pokercore.hand_class_names()
+    assert len(names) == 169
+    assert names[:2] == ["AA", "AKs"] and names[13] == "AKo" and names[-1] == "22"
+    grid = pokercore.range_grid("AA, AKs:0.5")
+    assert grid[0] == 1.0 and grid[1] == 0.5 and sum(grid) == 1.5
+
+
+def test_hand_strength():
+    s = pokercore.hand_strength("KhKd", "AA", "Ac7c2d")
+    assert s.lose == pytest.approx(1.0)
+    assert s.combos == pytest.approx(3)
+    with pytest.raises(ValueError):
+        pokercore.hand_strength("Kh", "AA", "Ac7c2d")

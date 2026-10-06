@@ -174,3 +174,21 @@ TEST_CASE("equity input validation", "[equity]") {
   std::vector<Range> eleven(11, Range::parse("random"));
   CHECK_THROWS_AS(calculate_equity(eleven, {}), std::invalid_argument);
 }
+
+TEST_CASE("hand strength against a range on the current board", "[equity]") {
+  const Combo aa = make_combo(parse_card("Ah"), parse_card("Ad"));
+  // Top set beats every pair below; 77 and 22 make smaller sets and still lose.
+  const auto s = hand_strength(aa, Range::parse("KK-22"), parse_cards("As7c2d"));
+  CHECK(s.win == Approx(1.0));
+  CHECK(s.win + s.tie + s.lose == Approx(1.0));
+  CHECK(s.combos == Approx(10 * 6 + 3 + 3));  // 77 and 22 each lose combos to the board
+
+  const auto behind = hand_strength(make_combo(parse_card("Kh"), parse_card("Kd")), Range::parse("AA"),
+                                    parse_cards("Ac7c2d"));
+  CHECK(behind.lose == Approx(1.0));
+  CHECK(behind.combos == Approx(3));
+
+  CHECK_THROWS_AS(hand_strength(aa, Range::parse("KK"), parse_cards("AsKs")), std::invalid_argument);
+  CHECK_THROWS_AS(hand_strength(aa, Range::parse("KK"), parse_cards("Ah7c2d")),
+                  std::invalid_argument);
+}

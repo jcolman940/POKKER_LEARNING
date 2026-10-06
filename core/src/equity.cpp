@@ -351,4 +351,39 @@ EquityResult calculate_equity(const std::vector<Range>& players, const std::vect
   return monte_carlo(live, board_mask, dead_mask, missing, options.iterations, seed);
 }
 
+HandStrength hand_strength(Combo hero, const Range& villain, const std::vector<Card>& board,
+                           const std::vector<Card>& dead) {
+  if (board.size() < 3 || board.size() > 5) {
+    throw std::invalid_argument("hand strength needs a board of 3 to 5 cards");
+  }
+  const CardMask board_mask = to_mask(board);
+  const CardMask dead_mask = to_mask(dead);
+  if (std::popcount(board_mask) != static_cast<int>(board.size())) {
+    throw std::invalid_argument("duplicate board card");
+  }
+  if (hero.mask() & (board_mask | dead_mask)) {
+    throw std::invalid_argument("hero cards collide with the board or dead cards");
+  }
+
+  const HandValue hero_value = evaluate(hero.mask() | board_mask);
+  HandStrength out;
+  for (const auto& wc : villain.combos(board_mask | dead_mask | hero.mask())) {
+    const HandValue v = evaluate(wc.combo.mask() | board_mask);
+    if (hero_value > v) {
+      out.win += wc.weight;
+    } else if (hero_value == v) {
+      out.tie += wc.weight;
+    } else {
+      out.lose += wc.weight;
+    }
+    out.combos += wc.weight;
+  }
+  if (out.combos > 0.0) {
+    out.win /= out.combos;
+    out.tie /= out.combos;
+    out.lose /= out.combos;
+  }
+  return out;
+}
+
 }  // namespace pokercore

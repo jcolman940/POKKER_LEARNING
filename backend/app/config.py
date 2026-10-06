@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     ranges_dir: Path = REPO_ROOT / "data" / "ranges"
     spots_dir: Path = REPO_ROOT / "data" / "spots"
 
+    # Equity engine
+    equity_iterations: int = 200_000
+    equity_exact_limit: float = 3e7
+
     # External postflop solver (TexasSolver console binary). Optional until phase 5.
     solver_path: Path | None = None
 

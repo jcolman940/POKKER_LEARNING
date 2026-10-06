@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from app.api import system
+from app.api import ranges, simulator, system
 from app.config import get_settings
 from app.db import run_migrations
 
@@ -25,6 +26,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(system.router, prefix=settings.api_prefix)
+    app.include_router(simulator.router, prefix=settings.api_prefix)
+    app.include_router(ranges.router, prefix=settings.api_prefix)
+
+    # Domain and core errors (bad cards, empty ranges, impossible deals) are user input
+    # problems: report them as 422 with a readable message.
+    @app.exception_handler(ValueError)
+    @app.exception_handler(RuntimeError)
+    async def _input_error(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
+
     return app
 
 
