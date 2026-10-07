@@ -1101,3 +1101,22 @@ kbd {
     flex: 1 1 0;
   }
 }
+
+.leak-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.leak-row {
+  padding: 0.5rem 0;
+}
+
+.leak-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+}

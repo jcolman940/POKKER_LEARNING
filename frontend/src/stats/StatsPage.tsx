@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { getJson } from '../api/client'
 import { FilterBar } from './FilterBar'
 import { EMPTY_FILTERS, type Filters, filterQuery } from './filters'
+import type { InitialFilters } from '../trainer/types'
+import { LeaksPanel } from './LeaksPanel'
 import { type GraphPoint, WinningsChart } from './WinningsChart'
 
 interface Metric {
@@ -71,7 +73,7 @@ function ci(m: Metric): string {
   return `${num(m.ci_low, m.unit)} – ${num(m.ci_high, m.unit)}`
 }
 
-export function StatsPage() {
+export function StatsPage({ onTrain }: { onTrain?: (f: InitialFilters) => void }) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [groupBy, setGroupBy] = useState('none')
   const [stats, setStats] = useState<StatsOut | null>(null)
@@ -205,6 +207,8 @@ export function StatsPage() {
           </p>
         )}
       </section>
+
+      <LeaksPanel filters={filters} onTrain={(f) => onTrain?.(f)} />
 
       <section className="panel">
         <WinningsChart points={graph} />

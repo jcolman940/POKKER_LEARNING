@@ -7,6 +7,7 @@ import { ChartsPage } from './ranges/ChartsPage'
 import { type InitialScenario, SimulatorPage } from './simulator/SimulatorPage'
 import { SolverPage } from './solver/SolverPage'
 import { StatsPage } from './stats/StatsPage'
+import type { InitialFilters } from './trainer/types'
 import { TrainerPage } from './trainer/TrainerPage'
 
 const SECTIONS = [
@@ -32,6 +33,8 @@ export default function App() {
   const [section, setSection] = useState<string>('simulator')
   const [handId, setHandId] = useState<number | null>(null)
   const [spot, setSpot] = useState<{ key: number; scenario: InitialScenario } | null>(null)
+
+  const [trainer, setTrainer] = useState<{ key: number; filters?: InitialFilters }>({ key: 0 })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -96,11 +99,18 @@ export default function App() {
               }}
             />
           ))}
-        {section === 'stats' && <StatsPage />}
+        {section === 'stats' && (
+          <StatsPage
+            onTrain={(filters) => {
+              setTrainer({ key: Date.now(), filters })
+              setSection('trainer')
+            }}
+          />
+        )}
         {section === 'ranges' && <ChartsPage />}
         {section === 'pushfold' && <PushFoldPage />}
         {section === 'solver' && <SolverPage />}
-        {section === 'trainer' && <TrainerPage />}
+        {section === 'trainer' && <TrainerPage key={trainer.key} initialFilters={trainer.filters} />}
       </main>
 
       <footer className="app-footer">
