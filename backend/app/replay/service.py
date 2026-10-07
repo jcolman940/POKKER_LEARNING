@@ -14,7 +14,8 @@ import pokercore
 from pydantic import BaseModel
 
 from app.domain.hand import AGGRESSIVE, POSTS, Action, ActionType, HandRecord
-from app.domain.scenario import TOURNAMENT_FORMATS, Situation, Street
+from app.domain.preflop import preflop_situation
+from app.domain.scenario import TOURNAMENT_FORMATS, Street
 
 STREET_LABEL = {
     Street.PREFLOP: "Preflop",
@@ -142,31 +143,6 @@ class _State:
         )
 
 
-def _situation(state: _State, hero: str, preflop: list[Action]) -> Situation:
-    raises = [a for a in preflop if a.type in AGGRESSIVE]
-    others = [a for a in raises if a.player != hero]
-    hero_raised = any(a.player == hero for a in raises)
-    pos = state.pos[hero]
-    if raises and raises[-1].all_in and raises[-1].player != hero:
-        return Situation.VS_ALLIN
-    if not raises:
-        active = [p for p in state.stacks if p not in state.folded and p != hero]
-        if pos in ("SB", "BB") and all(state.pos[p] in ("SB", "BB") for p in active):
-            return Situation.BVB
-        return Situation.RFI
-    if len(raises) == 1:
-        opener = raises[0]
-        if pos == "BB" and state.pos.get(opener.player) == "SB":
-            return Situation.BVB
-        after = preflop[preflop.index(opener) + 1 :]
-        if any(a.type == ActionType.CALL and a.player != hero for a in after):
-            return Situation.SQUEEZE
-        return Situation.VS_OPEN
-    if len(raises) == 2 or (hero_raised and len(others) == 1):
-        return Situation.VS_3BET
-    return Situation.VS_4BET
-
-
 def _scenario(
     state: _State, hero: str, ranges: dict[str, str], preflop: list[Action], log: list[str]
 ) -> dict:
@@ -203,7 +179,7 @@ def _scenario(
         "ante_bb": round(r.ante / bb, 4),
     }
     if state.street == Street.PREFLOP:
-        scenario["situation"] = _situation(state, hero, preflop).value
+        scenario["situation"] = preflop_situation(state.pos, hero, preflop, set(state.folded)).value
         if r.game_type in TOURNAMENT_FORMATS:
             scenario["stacks_bb"] = {
                 state.pos[s.name]: round(s.stack / bb, 4) for s in r.dealt_seats
