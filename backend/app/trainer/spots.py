@@ -229,6 +229,12 @@ def _chart_usable(chart: PreflopChart) -> Situation | None:
         return None
     if chart.position not in order:
         return None
+    if (
+        GameFormat(chart.game_format) in TOURNAMENT_FORMATS
+        and chart.stack_bb <= get_settings().pushfold_max_bb
+        and situation in (Situation.RFI, Situation.VS_ALLIN)
+    ):
+        return None  # recommend() routes these to push/fold: they belong to that source
     if chart.vs_position and (
         chart.vs_position not in order or chart.vs_position == chart.position
     ):

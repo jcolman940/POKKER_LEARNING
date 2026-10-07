@@ -3,6 +3,7 @@ import random
 import numpy as np
 
 from app.db.models import PreflopChart
+from app.domain.positions import preflop_order
 from app.domain.scenario import Scenario, Situation, Villain
 from app.recommend.engine import recommend
 from app.recommend.preflop_equity import class_names, combos_per_class, hand_class
@@ -214,3 +215,24 @@ def test_card_key_pushfold(db_session):
     assert card_key(spot) == spot.card_key
     parts = spot.card_key.split("|")
     assert parts[:5] == ["pushfold", "mtt", "BTN", "rfi", "-"]
+
+
+def test_generate_chart_skips_pushfold_spots(db_session):
+    db_session.add(_chart(game_format="mtt", stack_bb=10.0))
+    db_session.commit()
+    assert generate_chart(db_session, random.Random(1), {}) is None
+    db_session.add(_chart(game_format="mtt", stack_bb=30.0, name="30bb"))
+    db_session.commit()
+    spot = generate_chart(db_session, random.Random(1), {})
+    assert spot is not None and spot.scenario.effective_stack_bb == 30.0
+    assert recommend(spot.scenario, db_session).source == "chart"
+
+
+def test_pushfold_nine_handed_vs_allin(db_session):
+    f = {"table_sizes": [9], "situations": ["vs_allin"]}
+    spot = generate_pushfold(db_session, random.Random(2), f, [])
+    assert spot is not None
+    sc = spot.scenario
+    order = preflop_order(9)
+    assert order.index(sc.villains[0].position) < order.index(sc.hero_position)
+    assert recommend(sc, db_session).source == "nash"
