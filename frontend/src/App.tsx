@@ -5,6 +5,7 @@ import { ReplayerView } from './history/ReplayerView'
 import { PushFoldPage } from './pushfold/PushFoldPage'
 import { ChartsPage } from './ranges/ChartsPage'
 import { type InitialScenario, SimulatorPage } from './simulator/SimulatorPage'
+import { SolverPage } from './solver/SolverPage'
 import { StatsPage } from './stats/StatsPage'
 
 const SECTIONS = [
@@ -14,10 +15,11 @@ const SECTIONS = [
   { id: 'history', label: 'Historiales', phase: 4 },
   { id: 'stats', label: 'Estadísticas', phase: 4 },
   { id: 'replayer', label: 'Replayer', phase: 4 },
+  { id: 'solver', label: 'Solver', phase: 5 },
   { id: 'trainer', label: 'Entrenador', phase: 6 },
 ] as const
 
-const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold', 'history', 'stats', 'replayer'])
+const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold', 'history', 'stats', 'replayer', 'solver'])
 
 type BackendStatus =
   | { state: 'loading' }
@@ -96,6 +98,7 @@ export default function App() {
         {section === 'stats' && <StatsPage />}
         {section === 'ranges' && <ChartsPage />}
         {section === 'pushfold' && <PushFoldPage />}
+        {section === 'solver' && <SolverPage />}
       </main>
 
       <footer className="app-footer">
