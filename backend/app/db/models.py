@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -151,3 +152,43 @@ class TournamentResult(Base):
     finish: Mapped[int | None] = mapped_column(Integer, nullable=True)
     entrants: Mapped[int | None] = mapped_column(Integer, nullable=True)
     currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+
+
+class SolverResult(Base):
+    """A solved postflop spot (current street only), keyed by the spot hash."""
+
+    __tablename__ = "solver_results"
+
+    hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    spot: Mapped[dict] = mapped_column(JSON)
+    tree: Mapped[bytes] = mapped_column(LargeBinary)  # zlib-compressed StrategyNode JSON
+    exploitability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    iterations: Mapped[int] = mapped_column(Integer, default=0)
+    solve_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    solver_version: Mapped[str] = mapped_column(String(32))
+    preset: Mapped[str] = mapped_column(String(32))
+    library_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class SolverJob(Base):
+    """A queued/running/finished solve. Survives restarts (running -> queued on startup)."""
+
+    __tablename__ = "solver_jobs"
+    __table_args__ = (Index("ix_solver_jobs_pick", "status", "priority", "id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    spot_hash: Mapped[str] = mapped_column(String(64), index=True)
+    spot: Mapped[dict] = mapped_column(JSON)
+    label: Mapped[str] = mapped_column(String(200))
+    origin: Mapped[str] = mapped_column(String(16))  # simulator / batch / library
+    priority: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(16))  # queued/running/done/failed/cancelled
+    iteration: Mapped[int] = mapped_column(Integer, default=0)
+    exploitability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pid: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    library_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

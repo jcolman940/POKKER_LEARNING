@@ -14,3 +14,13 @@ def test_migrations_match_models(tmp_path):
         diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
     engine.dispose()
     assert diff == []
+
+
+def test_solver_tables_exist(tmp_path):
+    url = f"sqlite:///{tmp_path / 's.sqlite3'}"
+    run_migrations(url)
+    engine = sa.create_engine(url)
+    tables = sa.inspect(engine).get_table_names()
+    engine.dispose()
+    assert "solver_results" in tables
+    assert "solver_jobs" in tables
