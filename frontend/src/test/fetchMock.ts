@@ -12,7 +12,7 @@ export function mockApi(routes: Record<string, Handler>) {
       return m === method && url.startsWith(path)
     })
     if (!key) return new Response(JSON.stringify({ detail: 'not mocked' }), { status: 404 })
-    const body = init?.body ? JSON.parse(String(init.body)) : undefined
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body
     const { status = 200, json } = routes[key](body)
     return new Response(JSON.stringify(json), { status })
   })
