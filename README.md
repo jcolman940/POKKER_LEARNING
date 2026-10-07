@@ -88,7 +88,7 @@ Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuen
   con reporte de archivo/mano/línea. **Los parsers de GGPoker y PokerStars se escriben contra archivos
   reales de muestra**: hasta tenerlos, ninguna sala está soportada.
 - **Modelo normalizado** `HandRecord` (`backend/app/domain/hand.py`): lo producen los parsers y lo consumen
-  estadísticas, replayer y (fase 6) entrenador.
+  estadísticas, replayer y entrenador/leak finder (fase 6).
 - **Estadísticas** (`/api/stats`): VPIP, PFR, 3-bet, fold to 3-bet, c-bet flop/turn, fold to c-bet, WTSD, W$SD,
   AF/AFq, winrate y winrate all-in EV (bb/100), con muestra, IC 95% y aviso de muestra insuficiente
   (`POKER_STATS_MIN_SAMPLE`). Cortes por posición, mano, stack, mesa, formato y mes; gráfico de ganancias
@@ -150,6 +150,42 @@ hay que reanudarla en *Solver → Cola*.
 - Los rangos se envían al solver por clase de mano; el resultado se marca "aproximado" solo
   cuando los pesos de una misma clase difieren entre combos (ahí se promedian).
 
+## Entrenador y leak finder (fase 6)
+
+**Entrenador.** Elegís una acción para un spot, se compara con la recomendación del sistema y se puntúa.
+Fuentes:
+- **Push/fold MTT** (Nash/ICM): EV exacto, en bb o en unidades ICM.
+- **Preflop desde tus tablas**: error de frecuencia, siempre marcado "aproximado". Las tablas de MTT de stack
+  corto que el sistema resuelve por push/fold quedan fuera de esta fuente.
+- **"Pintá tu rango"**: pintás en la matriz 13×13 el rango de una tabla y acción; la precisión está
+  ponderada por combos (correcto ≥ 90 %, aceptable ≥ 75 %).
+
+**Veredictos.** Push/fold: correcto si la pérdida es ≤ 0,05 (umbral de indiferencia). Tablas: correcto si la
+frecuencia de tu acción es ≥ 50 % o es la más alta; aceptable entre 10 % y 50 %; error si es < 10 %.
+La referencia nunca se muestra antes de responder.
+
+**Dificultad y premios.** La dificultad (0-100 %, por defecto 50) es la proporción de manos de frontera.
+Hay dos estructuras de premios incluidas (Mesa final 9 y Burbuja SNG) y las tuyas, editables desde el
+entrenador. Atajos: F/C/R para fold/call/raise, 1-9 por botón y Enter para seguir.
+
+**Repetición espaciada** (SM-2 simplificado). Un error vuelve 3 a 5 spots después dentro de la sesión; un
+acierto agranda el intervalo: 1 día, 3 días y luego × facilidad. Hay modo repaso y la lista "Tus errores
+frecuentes", con el botón "Entrenar solo estas".
+
+**Leak finder** (*Estadísticas → Leaks*). Compara tus decisiones preflop reales (hasta dos por mano: la
+primera y la respuesta a un 3-bet/4-bet) con tus tablas (la más cercana, marcada "aproximado" con las
+diferencias) y, en torneos con ≤ 15bb en RFI o vs all-in, con el Nash de push/fold en chip EV. Para cada
+clase de mano se calcula la frecuencia esperada; es un leak si n ≥ `POKER_LEAKS_MIN_SAMPLE` (50), la
+esperada queda fuera del IC 95 % de Wilson y |diferencia| ≥ 5 puntos. El impacto se estima en bb/100
+(push/fold, pérdida de EV exacta) o pts/100 (tablas). "Entrenar este spot" abre el entrenador filtrado.
+Necesita manos importadas (los parsers de GGPoker y PokerStars esperan archivos reales).
+
+**Limitaciones.**
+- Sin spots postflop ni spots de tu propio historial en el entrenador por ahora.
+- Los leaks de push/fold se miden en chip EV, no en ICM.
+- Racha y objetivo diario quedan para una actualización posterior; un explicador conversacional con LLM
+  está anotado en el spec (fuera de alcance).
+
 ## Configuración
 
 Centralizada en `backend/app/config.py`. Toda opción se puede sobreescribir con
@@ -172,6 +208,7 @@ variables `POKER_*` o un archivo `.env` en `backend/`:
 | `POKER_HEURISTIC_REALIZATION_OOP` | `0.85` | Heurística multiway: realización de equity fuera de posición |
 | `POKER_HEURISTIC_REALIZATION_LAST` | `0.95` | Heurística multiway: factor de realización de equity en posición / última en hablar |
 | `POKER_HEURISTIC_MARGIN` | `0.03` | Heurística multiway: margen alrededor de los umbrales para mezclar acciones |
+| `POKER_LEAKS_MIN_SAMPLE` | `50` | Muestra mínima por spot para que el leak finder marque un leak |
 | `POKER_UPDATE_FEED_URL` | — | Canal de actualizaciones (fase 7) |
 
 La versión de la app se lee de `VERSION` y se expone en `GET /api/version`.

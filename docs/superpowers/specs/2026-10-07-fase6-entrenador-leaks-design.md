@@ -88,7 +88,7 @@ Además de las estructuras fijas (§4.1), el usuario puede guardar **sus propias
 Ejercicio de rango completo en vez de mano por mano:
 - Se elige una tabla (al azar dentro de los filtros, o una puntual) y una acción a dibujar (por ejemplo "raise" en RFI de CO a 100bb).
 - El usuario pinta el rango en la matriz 13×13 (el mismo editor de "Rangos preflop", con frecuencias 0/50/100%).
-- Puntaje: **error ponderado por combos** = `Σ_clases combos × |pintado − tabla| / Σ combos` y su complemento como "precisión". Siempre "aproximado"/sin EV.
+- Puntaje: **error ponderado por combos** = `Σ_clases combos × |pintado − tabla| / Σ_clases combos × max(pintado, tabla)` (se excluyen las clases con max = 0) y su complemento (precisión = 1 − error) como "precisión". Siempre "aproximado"/sin EV.
 - Feedback: grilla de diferencias (manos que sobran, que faltan, frecuencias erradas), las 10 clases con más peso en el error y precisión en %.
 - Se registra en `trainer_attempts` (fuente `range`), con su propia tarjeta por tabla+acción en la repetición espaciada (veredicto: correcto ≥ 90% de precisión, aceptable ≥ 75%, error < 75%).
 
