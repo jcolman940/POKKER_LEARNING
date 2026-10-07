@@ -15,6 +15,7 @@ router = APIRouter(tags=["system"])
 class VersionInfo(BaseModel):
     app: str
     core: str
+    packaged: bool
 
 
 class HealthInfo(BaseModel):
@@ -24,7 +25,9 @@ class HealthInfo(BaseModel):
 
 @router.get("/version", response_model=VersionInfo)
 def version(settings: Annotated[Settings, Depends(get_settings)]) -> VersionInfo:
-    return VersionInfo(app=settings.app_version, core=pokercore.version())
+    return VersionInfo(
+        app=settings.app_version, core=pokercore.version(), packaged=settings.packaged
+    )
 
 
 @router.get("/health", response_model=HealthInfo)

@@ -85,9 +85,20 @@ class Settings(BaseSettings):
     # Update channel (phase 7): e.g. a GitHub Releases API URL.
     update_feed_url: str | None = None
 
+    # Packaged mode (phase 7): the launcher sets a token and the built frontend directory.
+    web_dir: Path | None = None
+    launch_token: str | None = None
+    host: str = "127.0.0.1"
+    port: int = 8000
+    heartbeat_timeout_s: float = 60.0
+
     # HTTP
     api_prefix: str = "/api"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+    @property
+    def packaged(self) -> bool:
+        return self.launch_token is not None
 
     @property
     def resolved_ranges_dir(self) -> Path:

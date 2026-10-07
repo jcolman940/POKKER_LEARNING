@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import (
+    app_control,
     charts,
     hands,
     leaks,
@@ -20,6 +21,7 @@ from app.api import (
 from app.config import get_settings
 from app.db import run_migrations
 from app.db.session import _session_factory
+from app.packaged import Heartbeat, Watchdog, install_host_check, mount_web
 from app.solver.worker_registry import start_worker, stop_worker
 from app.stats.decisions import backfill_decisions
 
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(app: FastAPI):
     if get_settings().auto_migrate:
         run_migrations()
         try:
@@ -36,8 +38,28 @@ async def lifespan(_app: FastAPI):
         except Exception:  # a failed backfill must never keep the app from booting
             logger.exception("Decision backfill failed")
     start_worker()  # no-op unless POKER_SOLVER_PATH points to an existing binary
+    watchdog = None
+    settings = get_settings()
+    if settings.packaged:
+        watchdog = Watchdog(
+            app.state.heartbeat,
+            settings.heartbeat_timeout_s,
+            solver_busy=_solver_has_work,
+            check_every=getattr(app.state, "watchdog_check_every", 5.0),
+        )
+        watchdog.start()
     yield
+    if watchdog is not None:
+        watchdog.stop()
     stop_worker()
+
+
+def _solver_has_work() -> bool:
+    from app.api.app_control import solver_activity
+
+    with _session_factory()() as session:
+        busy, pending = solver_activity(session)
+    return busy or pending > 0
 
 
 def create_app() -> FastAPI:
@@ -59,6 +81,9 @@ def create_app() -> FastAPI:
     app.include_router(leaks.router, prefix=settings.api_prefix)
     app.include_router(solver.router, prefix=settings.api_prefix)
     app.include_router(trainer.router, prefix=settings.api_prefix)
+    if settings.packaged:
+        app.state.heartbeat = Heartbeat()
+        app.include_router(app_control.router, prefix=settings.api_prefix)
 
     # Domain and core errors (bad cards, empty ranges, impossible deals) are user input
     # problems: report them as 422 with a readable message.
@@ -66,6 +91,13 @@ def create_app() -> FastAPI:
     @app.exception_handler(RuntimeError)
     async def _input_error(_request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    # Packaged mode: serve the built frontend on the same port (after every /api route) and
+    # only accept loopback Host headers. Added last so the check runs first.
+    if settings.packaged:
+        if settings.web_dir is not None:
+            mount_web(app, settings.web_dir)
+        install_host_check(app)
 
     return app
 
