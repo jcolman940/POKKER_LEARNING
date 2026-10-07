@@ -131,6 +131,45 @@ describe('TrainerPage', () => {
     })
   })
 
+  it('gives every configuration checkbox an accessible name', async () => {
+    mockApi(routes())
+    render(<TrainerPage />)
+    for (const name of [
+      'Push/fold',
+      'Pintá tu rango',
+      'Cash',
+      'Torneo (MTT)',
+      'BTN',
+      'BB',
+      /^RFI/,
+      'vs open',
+      '3-5',
+      '12-15',
+      '≤15',
+      '120+',
+    ]) {
+      expect(await screen.findByRole('checkbox', { name })).toBeInTheDocument()
+    }
+    expect(screen.queryAllByRole('checkbox', { name: '' })).toHaveLength(0)
+    expect(screen.queryAllByRole('checkbox', { name: 'on' })).toHaveLength(0)
+  })
+
+  it('sends prefer_due only when the bridge asks for it', async () => {
+    const sent = async (initialFilters?: Record<string, unknown>) => {
+      const fetchMock = mockApi(routes())
+      const { unmount } = render(<TrainerPage initialFilters={initialFilters} />)
+      await user.click(await screen.findByRole('button', { name: 'Empezar' }))
+      await screen.findByText('Foldean hasta vos', { exact: false })
+      const call = fetchMock.mock.calls.find(
+        ([url, init]) => String(url) === '/api/trainer/sessions' && init?.method === 'POST',
+      )
+      unmount()
+      return JSON.parse(String(call?.[1]?.body))
+    }
+    expect((await sent()).prefer_due).toBeFalsy()
+    expect((await sent({ positions: ['BTN'], preferDue: true })).prefer_due).toBe(true)
+  })
+
   it('disables a source with the reason from the backend', async () => {
     mockApi(routes())
     render(<TrainerPage />)
@@ -402,7 +441,7 @@ describe('payout structures', () => {
     render(<TrainerPage />)
     await screen.findByText('Top 3', { selector: '.payout-name' })
     fireEvent.change(screen.getByLabelText('Nombre de la estructura'), { target: { value: 'Heads up' } })
-    fireEvent.change(screen.getByLabelText('Premios (separados por coma)'), { target: { value: '65, 35' } })
+    fireEvent.change(screen.getByLabelText('Premios (separados por ; o espacios)'), { target: { value: '65, 35' } })
     await user.click(screen.getByRole('button', { name: 'Agregar estructura' }))
     expect(await screen.findByText('Heads up', { selector: '.payout-name' })).toBeInTheDocument()
     const call = fetchMock.mock.calls.find(([u, i]) => String(u) === '/api/trainer/payouts' && i?.method === 'POST')
@@ -414,7 +453,7 @@ describe('payout structures', () => {
     render(<TrainerPage />)
     await screen.findByText('Top 3', { selector: '.payout-name' })
     fireEvent.change(screen.getByLabelText('Nombre de la estructura'), { target: { value: 'X' } })
-    fireEvent.change(screen.getByLabelText('Premios (separados por coma)'), { target: { value: '50, abc' } })
+    fireEvent.change(screen.getByLabelText('Premios (separados por ; o espacios)'), { target: { value: '50, abc' } })
     await user.click(screen.getByRole('button', { name: 'Agregar estructura' }))
     expect(await screen.findByText(/números/)).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([u, i]) => String(u) === '/api/trainer/payouts' && i?.method === 'POST')).toBe(false)

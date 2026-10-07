@@ -36,7 +36,7 @@ const SOURCE_OPTIONS: [TrainerSource, string][] = [
   ['range', 'Pintá tu rango'],
 ]
 const POSITIONS = ['UTG', 'UTG+1', 'UTG+2', 'UTG+3', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
-const BUCKETS = ['3-5', '6-8', '9-11', '12-15', '16-30', '31-60', '61-120', '120+']
+const BUCKETS = ['3-5', '6-8', '9-11', '12-15', '≤15', '16-30', '31-60', '61-120', '120+']
 const MODES: [Mode, string][] = [
   ['normal', 'Normal'],
   ['review', 'Solo repaso'],
@@ -52,6 +52,7 @@ interface Filters {
   mode: Mode
   difficulty: number
   payoutId: number | null
+  preferDue: boolean
 }
 
 function initial(f?: InitialFilters): Filters {
@@ -64,6 +65,7 @@ function initial(f?: InitialFilters): Filters {
     mode: 'normal',
     difficulty: 50,
     payoutId: null,
+    preferDue: f?.preferDue ?? false,
   }
 }
 
@@ -195,6 +197,7 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
       mode: filters.mode,
       difficulty: filters.difficulty,
       payout_id: filters.payoutId,
+      ...(filters.preferDue ? { prefer_due: true } : {}),
       ...override,
     }
     try {

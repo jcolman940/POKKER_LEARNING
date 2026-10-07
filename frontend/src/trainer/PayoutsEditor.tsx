@@ -7,11 +7,18 @@ interface Props {
   onChange: (payouts: Payout[]) => void
 }
 
+// Prizes are separated by ";" or whitespace; "6,5" and "6.5" are both 6.5 (a trailing
+// comma, as in "50, 30, 20", is tolerated). Zero is allowed while the total is positive.
+const PRIZE = /^\d+(?:[.,]\d+)?$/
+
 function parsePrizes(text: string): number[] | null {
-  const parts = text.split(',').map((p) => p.trim().replace(',', '.'))
-  if (parts.length === 0 || parts.some((p) => p === '')) return null
-  const nums = parts.map(Number)
-  return nums.every((n) => Number.isFinite(n) && n > 0) ? nums : null
+  const parts = text
+    .split(/[;\s]+/)
+    .map((p) => p.replace(/,$/, ''))
+    .filter((p) => p !== '')
+  if (parts.length === 0 || !parts.every((p) => PRIZE.test(p))) return null
+  const nums = parts.map((p) => Number(p.replace(',', '.')))
+  return nums.reduce((a, b) => a + b, 0) > 0 ? nums : null
 }
 
 export function PayoutsEditor({ payouts, onChange }: Props) {
@@ -28,7 +35,7 @@ export function PayoutsEditor({ payouts, onChange }: Props) {
     }
     const nums = parsePrizes(prizes)
     if (!nums) {
-      setError('Los premios deben ser números positivos separados por coma.')
+      setError('Los premios deben ser números no negativos (con suma mayor que 0) separados por punto y coma o espacios, por ejemplo 30; 20; 14; 6,5.')
       return
     }
     setSaving(true)
@@ -78,11 +85,11 @@ export function PayoutsEditor({ payouts, onChange }: Props) {
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label>
-          Premios (separados por coma)
+          Premios (separados por ; o espacios)
           <input
             type="text"
             value={prizes}
-            placeholder="50, 30, 20"
+            placeholder="30; 20; 14; 6,5"
             onChange={(e) => setPrizes(e.target.value)}
           />
         </label>

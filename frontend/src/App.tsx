@@ -102,7 +102,7 @@ export default function App() {
         {section === 'stats' && (
           <StatsPage
             onTrain={(filters) => {
-              setTrainer({ key: Date.now(), filters })
+              setTrainer({ key: Date.now(), filters: { ...filters, preferDue: true } })
               setSection('trainer')
             }}
           />

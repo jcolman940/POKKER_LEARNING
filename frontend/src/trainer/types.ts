@@ -26,6 +26,7 @@ export interface SessionRequest {
   difficulty: number
   payout_id: number | null
   card_ids?: number[]
+  prefer_due?: boolean
 }
 
 export interface InitialFilters {
@@ -33,6 +34,7 @@ export interface InitialFilters {
   situations?: string[]
   formats?: string[]
   sources?: string[]
+  preferDue?: boolean // serve overdue cards before new spots (leaks bridge)
 }
 
 export interface SpotScenario {
