@@ -17,11 +17,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_VERSION = "0.0.0"
 
 
+def _env_resources_dir() -> Path:
+    raw = os.environ.get("POKER_RESOURCES_DIR")
+    return Path(raw) if raw else REPO_ROOT
+
+
 def read_app_version() -> str:
     """Return the app version from the single source of truth (the root VERSION file)."""
     if env_version := os.environ.get("POKER_APP_VERSION"):
         return env_version.strip()
-    version_file = REPO_ROOT / "VERSION"
+    version_file = _env_resources_dir() / "VERSION"
     if version_file.is_file():
         return version_file.read_text(encoding="utf-8").strip()
     return _DEFAULT_VERSION
@@ -42,9 +47,12 @@ class Settings(BaseSettings):
     database_url: str | None = None
     auto_migrate: bool = True
 
-    # Reference data shipped with the repo (preflop ranges, precomputed spots)
-    ranges_dir: Path = REPO_ROOT / "data" / "ranges"
-    spots_dir: Path = REPO_ROOT / "data" / "spots"
+    # Reference data shipped with the app (preflop ranges, precomputed spots, solver trees).
+    # In the packaged app POKER_RESOURCES_DIR points at the bundled resources; the individual
+    # overrides below are optional and take precedence over the derived locations.
+    resources_dir: Path = REPO_ROOT
+    ranges_dir: Path | None = None
+    spots_dir: Path | None = None
 
     # Equity engine
     equity_iterations: int = 200_000
@@ -63,8 +71,8 @@ class Settings(BaseSettings):
     solver_path: Path | None = None
     solver_threads: int = Field(default_factory=lambda: os.cpu_count() or 4)
     solver_timeout_min: float = 30.0
-    solver_trees_file: Path = REPO_ROOT / "data" / "solver" / "trees.json"
-    solver_library_file: Path = REPO_ROOT / "data" / "solver" / "library.json"
+    solver_trees_file: Path | None = None
+    solver_library_file: Path | None = None
 
     # Multiway postflop heuristic thresholds (own heuristics, not solver output).
     heuristic_value_share: float = 0.65
@@ -80,6 +88,26 @@ class Settings(BaseSettings):
     # HTTP
     api_prefix: str = "/api"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+    @property
+    def resolved_ranges_dir(self) -> Path:
+        return self.ranges_dir or self.resources_dir / "data" / "ranges"
+
+    @property
+    def resolved_spots_dir(self) -> Path:
+        return self.spots_dir or self.resources_dir / "data" / "spots"
+
+    @property
+    def resolved_solver_trees_file(self) -> Path:
+        return self.solver_trees_file or self.resources_dir / "data" / "solver" / "trees.json"
+
+    @property
+    def resolved_solver_library_file(self) -> Path:
+        return self.solver_library_file or self.resources_dir / "data" / "solver" / "library.json"
+
+    @property
+    def precomputed_dir(self) -> Path:
+        return self.resources_dir / "data" / "precomputed"
 
     @property
     def resolved_database_url(self) -> str:

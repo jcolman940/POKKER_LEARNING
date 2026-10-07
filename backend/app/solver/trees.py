@@ -56,7 +56,9 @@ def _parse(name: str, raw: dict) -> TreePreset:
 
 
 def load_presets(path: Path | None = None) -> dict[str, TreePreset]:
-    data = json.loads((path or get_settings().solver_trees_file).read_text(encoding="utf-8"))
+    data = json.loads(
+        (path or get_settings().resolved_solver_trees_file).read_text(encoding="utf-8")
+    )
     return {name: _parse(name, raw) for name, raw in data.items()}
 
 

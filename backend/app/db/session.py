@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
@@ -11,7 +12,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
 
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
+# Inside a PyInstaller bundle the alembic files live under sys._MEIPASS.
+BACKEND_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
 
 
 def ensure_sqlite_dir(url: str) -> None:

@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import pokercore
 
-from app.config import REPO_ROOT
+from app.config import get_settings
 
-MATRIX_PATH = REPO_ROOT / "data" / "precomputed" / "preflop_equity_169.npy"
 RANKS = "23456789TJQKA"
 
 
@@ -91,9 +91,13 @@ def _compatibility() -> np.ndarray:
     return member.T @ (~share).astype(float) @ member
 
 
+def matrix_path() -> Path:
+    return get_settings().precomputed_dir / "preflop_equity_169.npy"
+
+
 @lru_cache
 def preflop_equity() -> PreflopEquity:
-    equity = np.load(MATRIX_PATH).astype(float)
+    equity = np.load(matrix_path()).astype(float)
     compat = _compatibility()
     return PreflopEquity(equity=equity, compat=compat, weighted=equity * compat)
 

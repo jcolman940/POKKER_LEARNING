@@ -50,7 +50,9 @@ class Family(BaseModel):
 
 
 def load_library(path: Path | None = None) -> list[Family]:
-    data = json.loads((path or get_settings().solver_library_file).read_text(encoding="utf-8"))
+    data = json.loads(
+        (path or get_settings().resolved_solver_library_file).read_text(encoding="utf-8")
+    )
     return [Family(**f) for f in data["families"]]
 
 
