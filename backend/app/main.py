@@ -4,7 +4,18 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import charts, hands, leaks, pushfold, ranges, simulator, solver, stats, system
+from app.api import (
+    charts,
+    hands,
+    leaks,
+    pushfold,
+    ranges,
+    simulator,
+    solver,
+    stats,
+    system,
+    trainer,
+)
 from app.config import get_settings
 from app.db import run_migrations
 from app.db.session import _session_factory
@@ -41,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(stats.router, prefix=settings.api_prefix)
     app.include_router(leaks.router, prefix=settings.api_prefix)
     app.include_router(solver.router, prefix=settings.api_prefix)
+    app.include_router(trainer.router, prefix=settings.api_prefix)
 
     # Domain and core errors (bad cards, empty ranges, impossible deals) are user input
     # problems: report them as 422 with a readable message.
