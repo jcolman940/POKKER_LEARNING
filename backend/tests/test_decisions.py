@@ -136,3 +136,155 @@ def test_import_stores_decisions_and_backfill_is_idempotent(client, fake_room):
     with _session_factory()() as s:
         assert s.query(HandDecision).count() == 1
         assert backfill_decisions(s) == 0  # already at current version
+
+
+def _hand_rows(session, n):
+    from app.parsers.importer import hand_row
+
+    for i in range(n):
+        r = make_hand(
+            SIX,
+            [
+                act("p", "U", "fold"),
+                act("p", "H", "fold"),
+                act("p", "C", "fold"),
+                act("p", "Hero", "raise", 2.5),
+            ],
+            button="Hero",
+            hand_id=str(100 + i),
+        )
+        session.add(hand_row(r, "", None))
+    session.commit()
+
+
+def _reset_version(session):
+    from app.db.models import AppMeta, HandDecision
+    from app.stats.decisions import VERSION_KEY
+
+    session.query(HandDecision).delete()
+    session.query(AppMeta).filter(AppMeta.key == VERSION_KEY).delete()
+    session.commit()
+
+
+def test_backfill_recomputes_when_version_cleared(db_session):
+    from app.db.models import HandDecision
+    from app.stats.decisions import backfill_decisions
+
+    _hand_rows(db_session, 3)
+    _reset_version(db_session)
+    assert backfill_decisions(db_session) == 3
+    assert db_session.query(HandDecision).count() == 3
+    assert backfill_decisions(db_session) == 0
+
+
+def test_backfill_skips_corrupted_records(db_session, caplog):
+    from app.db.models import Hand, HandDecision
+    from app.stats.decisions import backfill_decisions
+
+    _hand_rows(db_session, 3)
+    bad = db_session.query(Hand).first()
+    record = dict(bad.record)
+    del record["seats"]
+    bad.record = record
+    db_session.commit()
+    _reset_version(db_session)
+    with caplog.at_level("WARNING"):
+        assert backfill_decisions(db_session) == 2
+    assert db_session.query(HandDecision).count() == 2
+    assert "1" in caplog.text and "skipped" in caplog.text
+    assert backfill_decisions(db_session) == 0
+
+
+def test_app_boots_with_a_corrupted_stored_record(client):
+    from fastapi.testclient import TestClient
+
+    from app.db.models import AppMeta, Hand
+    from app.db.session import _session_factory
+    from app.main import create_app
+    from app.stats.decisions import VERSION_KEY
+
+    with _session_factory()() as s:
+        _hand_rows(s, 2)
+        h = s.query(Hand).first()
+        record = dict(h.record)
+        del record["seats"]
+        h.record = record
+        s.query(AppMeta).filter(AppMeta.key == VERSION_KEY).delete()
+        s.commit()
+    with TestClient(create_app()) as c2:
+        assert c2.get("/api/version").status_code == 200
+
+
+def test_lifespan_survives_unexpected_backfill_failure(client, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import app.main as main
+
+    def boom(_session):
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setattr(main, "backfill_decisions", boom)
+    with TestClient(main.create_app()) as c2:
+        assert c2.get("/api/version").status_code == 200
+
+
+def _tourney(actions, stacks):
+    return make_hand(stacks, actions, button="Hero", game_type=GameFormat.MTT, ante=0.125)
+
+
+def test_pushfold_spot_only_for_cold_decisions():
+    stacks = {"U": 12, "H": 12, "C": 12, "Hero": 12, "S": 12, "B": 12}
+    # BTN opens 2.2, SB shoves, BTN calls: decision 2 is not cold.
+    r = _tourney(
+        [
+            act("p", "U", "fold"),
+            act("p", "H", "fold"),
+            act("p", "C", "fold"),
+            act("p", "Hero", "raise", 2.2),
+            act("p", "S", "raise", 12, all_in=True),
+            act("p", "B", "fold"),
+            act("p", "Hero", "call", 12),
+        ],
+        stacks,
+    )
+    decs = extract_decisions(r)
+    assert [x.idx for x in decs] == [1, 2]
+    assert decs[0].spot is not None
+    assert decs[1].situation == "vs_allin" and decs[1].spot is None
+    # Cold vs a shove keeps its spot.
+    r2 = _tourney(
+        [
+            act("p", "U", "fold"),
+            act("p", "H", "fold"),
+            act("p", "C", "raise", 12, all_in=True),
+            act("p", "Hero", "call", 12),
+        ],
+        stacks,
+    )
+    (dec,) = extract_decisions(r2)
+    assert dec.situation == "vs_allin" and dec.spot is not None
+
+
+def test_limp_then_shove_is_not_cold():
+    stacks = {"U": 12, "H": 12, "C": 12, "Hero": 12, "S": 12, "B": 12}
+    r = _tourney(
+        [
+            act("p", "U", "fold"),
+            act("p", "H", "fold"),
+            act("p", "C", "fold"),
+            act("p", "Hero", "call", 1),
+            act("p", "S", "raise", 12, all_in=True),
+            act("p", "B", "fold"),
+            act("p", "Hero", "call", 12),
+        ],
+        stacks,
+    )
+    decs = extract_decisions(r)
+    assert decs[0].action == "limp"
+    assert all(x.spot is None for x in decs[1:])
+
+
+def test_decisions_version_is_bumped():
+    from app.stats.decisions import DECISIONS_VERSION
+
+    assert DECISIONS_VERSION == 2

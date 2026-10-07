@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass
 
-from sqlalchemy import select
+from pydantic import ValidationError
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -14,8 +16,10 @@ from app.domain.preflop import preflop_situation
 from app.domain.scenario import TOURNAMENT_FORMATS, Situation, Street
 from app.recommend.preflop_equity import hand_class
 
-DECISIONS_VERSION = 1
+DECISIONS_VERSION = 2
 VERSION_KEY = "decisions_version"
+BACKFILL_CHUNK = 500
+logger = logging.getLogger(__name__)
 RAISE_LABEL = {0: "raise", 1: "3bet", 2: "4bet"}
 
 
@@ -84,8 +88,12 @@ def extract_decisions(record: HandRecord) -> list[Decision]:
         situation = preflop_situation(positions, hero, before, folded)
         vs = next((positions[b.player] for b in reversed(raises)), None)
         spot = None
+        cold = not any(b.player == hero for b in before) and (
+            situation == Situation.RFI or len(raises) == 1
+        )
         if (
-            record.game_type in TOURNAMENT_FORMATS
+            cold
+            and record.game_type in TOURNAMENT_FORMATS
             and stack_bb <= settings.pushfold_max_bb
             and situation in (Situation.RFI, Situation.VS_ALLIN)
         ):
@@ -121,13 +129,40 @@ def decision_rows(record: HandRecord) -> list[HandDecision]:
 
 
 def backfill_decisions(session: Session) -> int:
+    """Recompute every hand's decisions when the stored version is stale.
+
+    Works in chunks (only id and record are loaded) and skips records that no longer
+    validate instead of failing. Returns the number of hands processed.
+    """
     meta = session.get(AppMeta, VERSION_KEY)
     if meta is not None and meta.value == str(DECISIONS_VERSION):
         return 0
-    count = 0
-    for hand in session.scalars(select(Hand)):
-        hand.decisions = decision_rows(HandRecord.model_validate(hand.record))
-        count += 1
+    count = skipped = 0
+    last_id = 0
+    while True:
+        rows = session.execute(
+            select(Hand.id, Hand.record)
+            .where(Hand.id > last_id)
+            .order_by(Hand.id)
+            .limit(BACKFILL_CHUNK)
+        ).all()
+        if not rows:
+            break
+        last_id = rows[-1][0]
+        for hand_id, raw in rows:
+            try:
+                new = decision_rows(HandRecord.model_validate(raw))
+            except (ValidationError, ValueError, KeyError):
+                skipped += 1
+                continue
+            session.execute(delete(HandDecision).where(HandDecision.hand_id == hand_id))
+            for row in new:
+                row.hand_id = hand_id
+            session.add_all(new)
+            count += 1
+        session.commit()
+    if skipped:
+        logger.warning("Decision backfill skipped %d stored hands that failed to parse", skipped)
     session.merge(AppMeta(key=VERSION_KEY, value=str(DECISIONS_VERSION)))
     session.commit()
     return count

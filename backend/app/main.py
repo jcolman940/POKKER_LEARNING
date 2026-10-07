@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -22,13 +23,18 @@ from app.db.session import _session_factory
 from app.solver.worker_registry import start_worker, stop_worker
 from app.stats.decisions import backfill_decisions
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if get_settings().auto_migrate:
         run_migrations()
-        with _session_factory()() as session:
-            backfill_decisions(session)
+        try:
+            with _session_factory()() as session:
+                backfill_decisions(session)
+        except Exception:  # a failed backfill must never keep the app from booting
+            logger.exception("Decision backfill failed")
     start_worker()  # no-op unless POKER_SOLVER_PATH points to an existing binary
     yield
     stop_worker()
