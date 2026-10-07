@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -216,3 +217,76 @@ class SolverJob(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TrainerSession(Base):
+    """One trainer run: its filters, pending relearn cards and number of spots served."""
+
+    __tablename__ = "trainer_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    relearn: Mapped[list] = mapped_column(JSON, default=list)  # [{card_id, due_after}]
+    spots_served: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class TrainerCard(Base):
+    """A spaced-repetition card (one scenario or range-drill definition)."""
+
+    __tablename__ = "trainer_cards"
+    __table_args__ = (UniqueConstraint("key", name="uq_trainer_cards_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(200))
+    source: Mapped[str] = mapped_column(String(16))  # pushfold / chart / range
+    scenario: Mapped[dict] = mapped_column(JSON)
+    ease: Mapped[float] = mapped_column(Float, default=2.5)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reps: Mapped[int] = mapped_column(Integer, default=0)
+    lapses: Mapped[int] = mapped_column(Integer, default=0)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class TrainerAttempt(Base):
+    """A served spot and (once answered) its result. `reference` is server-side only."""
+
+    __tablename__ = "trainer_attempts"
+    __table_args__ = (UniqueConstraint("spot_id", name="uq_trainer_attempts_spot_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    spot_id: Mapped[str] = mapped_column(String(36))
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("trainer_sessions.id", ondelete="CASCADE"), index=True
+    )
+    card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("trainer_cards.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source: Mapped[str] = mapped_column(String(16))
+    scenario: Mapped[dict] = mapped_column(JSON)
+    offered: Mapped[dict | list] = mapped_column(JSON)
+    answer: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    reference: Mapped[dict] = mapped_column(JSON)
+    loss: Mapped[float | None] = mapped_column(Float, nullable=True)
+    loss_unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    verdict: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    approximate: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PayoutStructure(Base):
+    """A named tournament payout structure (percentages), builtin or user-defined."""
+
+    __tablename__ = "payout_structures"
+    __table_args__ = (UniqueConstraint("name", name="uq_payout_structures_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    payouts: Mapped[list[float]] = mapped_column(JSON)
+    builtin: Mapped[bool] = mapped_column(Boolean, default=False)
