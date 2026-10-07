@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import shutil
 import threading
 import urllib.request
@@ -24,6 +25,7 @@ CHUNK = 64 * 1024
 ERR_DOWNLOAD = "No se pudo descargar TexasSolver (sin conexión o GitHub no respondió)."
 ERR_HASH = "La descarga no coincide con el archivo oficial (hash distinto); no se instaló."
 ERR_EXTRACT = "No se pudo descomprimir TexasSolver: "
+ERR_INSTALL = "No se pudo instalar TexasSolver: "
 
 _RUNNING = ("downloading", "verifying", "extracting")
 
@@ -105,12 +107,20 @@ class Installer:
             except (zipfile.BadZipFile, OSError, ValueError) as exc:
                 raise _InstallError(ERR_EXTRACT + str(exc)) from exc
             target = tools / "TexasSolver"
-            shutil.rmtree(target, ignore_errors=True)
-            extract.rename(target)
+            old = tmp / "old"
+            had_old = target.exists()
+            if had_old:
+                target.rename(old)
+            try:
+                extract.rename(target)
+            except OSError:
+                if had_old:
+                    old.rename(target)
+                raise
         except _InstallError as exc:
             error = str(exc)
         except Exception as exc:  # unexpected: still report it in Spanish, never crash silently
-            error = ERR_EXTRACT + str(exc)
+            error = ERR_INSTALL + str(exc)
         else:
             error = None
         shutil.rmtree(tmp, ignore_errors=True)
@@ -132,7 +142,11 @@ class Installer:
                     out.write(chunk)
                     done += len(chunk)
                     self._set(bytes=done)
-        except (OSError, ValueError) as exc:  # URLError/HTTPError/timeouts are OSError
+        except (
+            OSError,
+            ValueError,
+            http.client.HTTPException,
+        ) as exc:
             raise _InstallError(ERR_DOWNLOAD) from exc
 
 

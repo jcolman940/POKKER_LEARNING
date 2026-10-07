@@ -35,32 +35,56 @@ export function SettingsPanel() {
     }
   }, [refresh])
 
-  useEffect(() => stopPolling, [stopPolling])
+  // Bumped on every new download and on unmount: stale callbacks compare against it.
+  const run = useRef(0)
+  useEffect(() => {
+    const token = run
+    return () => {
+      token.current++
+      stopPolling()
+    }
+  }, [stopPolling])
 
-  function poll() {
-    fetchInstall()
-      .then((st) => {
-        setInstall(st)
-        if (st.state === 'done' || st.state === 'error') {
-          stopPolling()
-          if (st.state === 'done') refresh()
-        }
-      })
-      .catch((e: unknown) => {
-        stopPolling()
-        setInstall({ state: 'error', bytes: 0, total: null, error: String(e) })
-      })
+  function fail(message: string) {
+    stopPolling()
+    setInstall({ state: 'error', bytes: 0, total: null, error: message })
   }
 
   function download() {
     stopPolling()
+    const mine = ++run.current
+    let failures = 0
+    let requested = 0
+    let applied = 0
+    const alive = () => mine === run.current
+    const poll = () => {
+      const id = ++requested
+      fetchInstall()
+        .then((st) => {
+          if (!alive() || id < applied) return
+          applied = id
+          failures = 0
+          setInstall(st)
+          if (st.state === 'done' || st.state === 'error') {
+            stopPolling()
+            if (st.state === 'done') refresh()
+          }
+        })
+        .catch((e: unknown) => {
+          if (!alive()) return
+          if (++failures >= 3) fail(String(e))
+        })
+    }
     setInstall({ state: 'downloading', bytes: 0, total: null, error: null })
     startInstall()
       .then((st) => {
+        if (!alive()) return
         setInstall(st)
         timer.current = setInterval(poll, 1000)
       })
-      .catch((e: unknown) => setInstall({ state: 'error', bytes: 0, total: null, error: String(e) }))
+      .catch((e: unknown) => {
+        if (alive()) fail(String(e))
+      })
   }
 
   function clear() {

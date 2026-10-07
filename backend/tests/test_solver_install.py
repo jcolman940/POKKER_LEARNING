@@ -181,7 +181,7 @@ def test_env_path_has_priority(env, tmp_path):
     assert install.detected_solver_path(missing) == installed
 
 
-def test_api_endpoints(client, served):
+def test_api_endpoints(client, served, monkeypatch):
     base, payloads = served
     from app.solver import install as inst_mod
 
@@ -191,8 +191,8 @@ def test_api_endpoints(client, served):
     data = _make_zip({EXE: b"x"})
     payloads["/ts.zip"] = data
     # The API uses the real URL/hash; patch the constants to the local server.
-    inst_mod.TEXASSOLVER_URL = f"{base}/ts.zip"
-    inst_mod.TEXASSOLVER_SHA256 = hashlib.sha256(data).hexdigest()
+    monkeypatch.setattr(inst_mod, "TEXASSOLVER_URL", f"{base}/ts.zip")
+    monkeypatch.setattr(inst_mod, "TEXASSOLVER_SHA256", hashlib.sha256(data).hexdigest())
     try:
         r = client.post("/api/solver/install")
         assert r.status_code == 202
@@ -205,3 +205,28 @@ def test_api_endpoints(client, served):
     finally:
         stop_worker()
         inst_mod.Installer.reset()
+
+
+def test_failed_final_rename_keeps_old_install(env, served, monkeypatch):
+    base, payloads = served
+    target = env.data_dir / install.TOOLS_SUBDIR
+    old_exe = target / EXE
+    old_exe.parent.mkdir(parents=True)
+    old_exe.write_bytes(b"old")
+    data = _make_zip({EXE: b"new"})
+    payloads["/ts.zip"] = data
+
+    real_rename = Path.rename
+
+    def flaky(self, dst):
+        if self.name == "extract":
+            raise OSError("boom")
+        return real_rename(self, dst)
+
+    monkeypatch.setattr(Path, "rename", flaky)
+    inst = install.Installer.get()
+    inst.start(f"{base}/ts.zip", hashlib.sha256(data).hexdigest())
+    st = _wait(inst)
+    assert st.state == "error"
+    assert st.error.startswith("No se pudo instalar TexasSolver")
+    assert old_exe.read_bytes() == b"old"

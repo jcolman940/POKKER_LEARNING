@@ -103,4 +103,47 @@ describe('SettingsPanel solver download', () => {
     expect(await screen.findByText(/No se pudo descargar TexasSolver/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Descargar TexasSolver/ })).toBeEnabled()
   })
+
+  it('stops polling after unmount, even with a pending POST', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let release: () => void = () => {}
+    const gate = new Promise<void>((r) => {
+      release = r
+    })
+    const fn = mockApi({
+      'GET /api/solver/status': () => ({ json: { ...base, configured: false, path: null } }),
+      'POST /api/solver/install': () => ({ status: 202, json: { ...idle, state: 'downloading' } }),
+      'GET /api/solver/install': () => ({ json: { state: 'downloading', bytes: 1, total: 10, error: null } }),
+    })
+    const original = fn.getMockImplementation()!
+    fn.mockImplementation(async (input, init) => {
+      if (String(input) === '/api/solver/install' && init?.method === 'POST') await gate
+      return original(input, init)
+    })
+    const { unmount } = render(<SettingsPanel />)
+    fireEvent.click(await screen.findByRole('button', { name: /Descargar TexasSolver/ }))
+    unmount()
+    release()
+    await act(() => vi.advanceTimersByTimeAsync(5000))
+    expect(installGets(fn)).toBe(0)
+  })
+
+  it('tolerates transient poll failures before showing an error', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let polls = 0
+    mockApi({
+      'GET /api/solver/status': () => ({ json: { ...base, configured: false, path: null } }),
+      'POST /api/solver/install': () => ({ status: 202, json: { ...idle, state: 'downloading' } }),
+      'GET /api/solver/install': () => {
+        polls++
+        if (polls <= 2) return { status: 500, json: { detail: 'fallo' } }
+        return { json: { state: 'downloading', bytes: 5, total: 10, error: null } }
+      },
+    })
+    render(<SettingsPanel />)
+    fireEvent.click(await screen.findByRole('button', { name: /Descargar TexasSolver/ }))
+    await act(() => vi.advanceTimersByTimeAsync(3000))
+    expect(screen.queryByText('fallo')).toBeNull()
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('value', '5')
+  })
 })
