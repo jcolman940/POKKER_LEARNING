@@ -122,6 +122,7 @@ def test_cancel_running_job_stops_the_solver(db_session, worker, fake):
         time.sleep(0.02)
     cancel_job(db_session, job.id)
     t.join(10)
+    assert not t.is_alive()
     db_session.refresh(job)
     assert job.status == JobStatus.CANCELLED
 
@@ -134,14 +135,16 @@ def test_simulator_job_preempts_running_batch(db_session, worker, fake):
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         db_session.refresh(batch)
-        if batch.status == JobStatus.RUNNING:
+        if batch.status == JobStatus.RUNNING and batch.iteration > 0:
             break
         time.sleep(0.02)
-    enqueue(db_session, spot(21), Origin.SIMULATOR)
+    sim = enqueue(db_session, spot(21), Origin.SIMULATOR)
     t.join(10)
+    assert not t.is_alive()
     db_session.refresh(batch)
     assert batch.status == JobStatus.QUEUED
     assert batch.priority == 10
+    assert next_job(db_session).id == sim.id
 
 
 def test_pause_blocks_the_worker(db_session, worker, fake):
@@ -170,3 +173,104 @@ def test_failed_workdirs_are_capped(db_session, worker, fake, tmp_path):
         worker.run_once()
     jobs_dir = tmp_path / "solver" / "jobs"
     assert len(list(jobs_dir.iterdir())) == 5
+
+
+def _start_running(db_session, worker, job):
+    t = threading.Thread(target=worker.run_once)
+    t.start()
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        db_session.refresh(job)
+        if job.status == JobStatus.RUNNING and job.iteration > 0:
+            break
+        time.sleep(0.02)
+    return t
+
+
+def _join(t):
+    t.join(10)
+    assert not t.is_alive()
+
+
+def test_unexpected_exception_marks_job_failed(db_session, worker, fake, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("kaput")
+
+    monkeypatch.setattr("app.solver.queue.parse_output", boom)
+    job = enqueue(db_session, spot(), Origin.BATCH)
+    assert worker.run_once() is True
+    db_session.refresh(job)
+    assert job.status == JobStatus.FAILED
+    assert "Error interno: kaput" in job.error
+
+
+def test_shutdown_does_not_requeue_a_cancelled_job(db_session, worker, fake):
+    fake("hang")
+    job = enqueue(db_session, spot(), Origin.BATCH)
+    t = _start_running(db_session, worker, job)
+    cancel_job(db_session, job.id)
+    worker._stop.set()
+    _join(t)
+    db_session.refresh(job)
+    assert job.status == JobStatus.CANCELLED
+
+
+def test_finish_stopped_never_requeues_cancelled(db_session, worker):
+    job = enqueue(db_session, spot(), Origin.BATCH)
+    cancel_job(db_session, job.id)
+    worker._finish_stopped(job.id, "preempted")
+    db_session.refresh(job)
+    assert job.status == JobStatus.CANCELLED
+
+
+def test_cancel_finished_job_raises(db_session, worker, fake):
+    job = enqueue(db_session, spot(), Origin.BATCH)
+    worker.run_once()
+    with pytest.raises(ValueError):
+        cancel_job(db_session, job.id)
+
+
+def test_bumped_priority_is_not_preempted(db_session, worker, fake):
+    fake("hang")
+    job = enqueue(db_session, spot(20), Origin.LIBRARY)
+    t = _start_running(db_session, worker, job)
+    enqueue(db_session, spot(20), Origin.SIMULATOR)  # same spot: bumps priority to 0
+    enqueue(db_session, spot(21), Origin.SIMULATOR)
+    time.sleep(0.3)  # several poll cycles (run_poll_s=0.02)
+    db_session.refresh(job)
+    assert job.priority == 0
+    assert job.status == JobStatus.RUNNING
+    cancel_job(db_session, job.id)
+    _join(t)
+
+
+def test_batch_does_not_preempt_library(db_session, worker, fake):
+    fake("hang")
+    job = enqueue(db_session, spot(20), Origin.LIBRARY)
+    t = _start_running(db_session, worker, job)
+    enqueue(db_session, spot(21), Origin.BATCH)
+    time.sleep(0.3)
+    db_session.refresh(job)
+    assert job.status == JobStatus.RUNNING
+    cancel_job(db_session, job.id)
+    _join(t)
+
+
+def test_no_preemption_while_paused(db_session, worker, fake):
+    fake("hang")
+    job = enqueue(db_session, spot(20), Origin.BATCH)
+    t = _start_running(db_session, worker, job)
+    set_paused(db_session, True)
+    enqueue(db_session, spot(21), Origin.SIMULATOR)
+    time.sleep(0.3)
+    db_session.refresh(job)
+    assert job.status == JobStatus.RUNNING
+    cancel_job(db_session, job.id)
+    _join(t)
+
+
+def test_queue_position_none_when_missing(db_session):
+    job = enqueue(db_session, spot(), Origin.BATCH)
+    db_session.expunge(job)
+    job.id = 12345  # stale id not present in the queue
+    assert queue_position(db_session, job) is None

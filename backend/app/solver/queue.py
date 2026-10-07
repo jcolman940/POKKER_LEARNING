@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import AppMeta, SolverJob, SolverResult
@@ -103,7 +103,7 @@ def queue_position(session: Session, job: SolverJob) -> int | None:
     if job.status != JobStatus.QUEUED:
         return None
     ids = list(session.scalars(_queued(session).with_only_columns(SolverJob.id)))
-    return ids.index(job.id) + 1
+    return ids.index(job.id) + 1 if job.id in ids else None
 
 
 def _get(session: Session, job_id: int) -> SolverJob:
@@ -115,11 +115,16 @@ def _get(session: Session, job_id: int) -> SolverJob:
 
 def cancel_job(session: Session, job_id: int) -> SolverJob:
     job = _get(session, job_id)
-    if job.status not in ACTIVE:
-        raise ValueError("Solo se puede cancelar un trabajo en cola o corriendo")
-    job.status = JobStatus.CANCELLED  # a running worker sees this and stops the solver
-    job.finished_at = _now()
+    # Conditional: the worker may finish the job between the read and the write.
+    changed = session.execute(
+        update(SolverJob)
+        .where(SolverJob.id == job_id, SolverJob.status.in_(ACTIVE))
+        .values(status=JobStatus.CANCELLED, finished_at=_now())  # a running worker sees this
+    ).rowcount
     session.commit()
+    session.refresh(job)
+    if not changed:
+        raise ValueError("Solo se puede cancelar un trabajo en cola o corriendo")
     return job
 
 
@@ -142,11 +147,15 @@ def _is_solver_process(pid: int) -> bool:
     Never use os.kill(pid, 0) for this on Windows: there it calls TerminateProcess.
     """
     if os.name == "nt":
-        out = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-            capture_output=True,
-            text=True,
-        ).stdout.lower()
+        try:
+            out = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            ).stdout.lower()
+        except (OSError, subprocess.TimeoutExpired):
+            return False
         return "console_solver" in out
     try:
         cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace").lower()
@@ -232,7 +241,21 @@ class SolverWorker:
             job.started_at = _now()
             job.iteration = 0
             session.commit()
-            job_id, priority = job.id, job.priority
+            job_id = job.id
+        try:
+            self._execute(job_id)
+        except Exception as e:  # never leave a job RUNNING
+            log.exception("solver job %s failed unexpectedly", job_id)
+            try:
+                self._finish(job_id, JobStatus.FAILED, error=f"Error interno: {e}")
+                self._prune_failed()
+            except Exception:
+                log.exception("could not mark solver job %s as failed", job_id)
+        return True
+
+    def _execute(self, job_id: int) -> None:
+        with self._sessions() as session:
+            job = _get(session, job_id)
             spot = SolverSpot.from_json(job.spot)
             library_key = job.library_key
 
@@ -248,54 +271,61 @@ class SolverWorker:
                 on_progress=lambda p: self._update(
                     job_id, iteration=p.iteration, exploitability=p.exploitability
                 ),
-                should_stop=lambda: self._should_stop(job_id, priority),
+                should_stop=lambda: self._should_stop(job_id),
                 poll_s=self._run_poll_s,
             )
             tree = parse_output(raw, spot.stack_bb)
         except SolverStopped as stop:
             self._finish_stopped(job_id, stop.reason)
             shutil.rmtree(workdir, ignore_errors=True)
-            return True
+            return
         except (SolverError, ValueError) as e:
             self._finish(job_id, JobStatus.FAILED, error=str(e))
             self._prune_failed()
-            return True
+            return
 
         with self._sessions() as session:
             store_result(session, spot, tree, progress, time.monotonic() - started, library_key)
+        # The result exists, so DONE wins even over a cancel that arrived meanwhile.
         self._finish(job_id, JobStatus.DONE, progress=progress)
         shutil.rmtree(workdir, ignore_errors=True)
-        return True
 
     def _update(self, job_id: int, **fields) -> None:
         with self._sessions() as session:
-            job = session.get(SolverJob, job_id)
-            for k, v in fields.items():
-                setattr(job, k, v)
+            session.execute(update(SolverJob).where(SolverJob.id == job_id).values(**fields))
             session.commit()
 
-    def _should_stop(self, job_id: int, priority: int) -> str | None:
-        if self._stop.is_set():
-            return "shutdown"
+    def _should_stop(self, job_id: int) -> str | None:
         with self._sessions() as session:
-            if session.get(SolverJob, job_id).status == JobStatus.CANCELLED:
+            job = session.get(SolverJob, job_id)
+            if job is None or job.status == JobStatus.CANCELLED:
                 return "cancelled"
-            if priority > 0:
+            if self._stop.is_set():
+                return "shutdown"
+            # Only a queued simulator job (priority 0) preempts, and never a simulator job.
+            # Uses the job's current priority (an enqueue may have bumped it).
+            if job.priority > 0 and not is_paused(session):
                 urgent = session.scalars(
-                    _queued(session).where(SolverJob.priority < priority).limit(1)
+                    _queued(session).where(SolverJob.priority == 0).limit(1)
                 ).first()
                 if urgent is not None:
                     return "preempted"
         return None
 
     def _finish_stopped(self, job_id: int, reason: str) -> None:
+        if reason in ("preempted", "shutdown"):
+            values = {"pid": None, "status": JobStatus.QUEUED, "started_at": None}
+            allowed = [JobStatus.RUNNING]  # never requeue a cancelled job
+        else:
+            values = {"pid": None}
+            allowed = [JobStatus.RUNNING, JobStatus.CANCELLED]
         with self._sessions() as session:
-            job = session.get(SolverJob, job_id)
-            job.pid = None
-            if reason in ("preempted", "shutdown"):
-                job.status = JobStatus.QUEUED
-                job.started_at = None
-            session.commit()  # cancelled jobs already have their final status
+            session.execute(
+                update(SolverJob)
+                .where(SolverJob.id == job_id, SolverJob.status.in_(allowed))
+                .values(**values)
+            )
+            session.commit()
 
     def _finish(
         self,
@@ -305,15 +335,19 @@ class SolverWorker:
         error: str | None = None,
         progress: Progress | None = None,
     ) -> None:
+        values: dict = {"status": status, "error": error, "pid": None, "finished_at": _now()}
+        if progress:
+            values["iteration"] = progress.iteration
+            values["exploitability"] = progress.exploitability
+        allowed = [JobStatus.RUNNING]
+        if status == JobStatus.DONE:
+            allowed.append(JobStatus.CANCELLED)
         with self._sessions() as session:
-            job = session.get(SolverJob, job_id)
-            job.status = status
-            job.error = error
-            job.pid = None
-            job.finished_at = _now()
-            if progress:
-                job.iteration = progress.iteration
-                job.exploitability = progress.exploitability
+            session.execute(
+                update(SolverJob)
+                .where(SolverJob.id == job_id, SolverJob.status.in_(allowed))
+                .values(**values)
+            )
             session.commit()
 
     def _prune_failed(self) -> None:
