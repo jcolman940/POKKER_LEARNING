@@ -15,6 +15,8 @@ interface Props {
   caption?: string
   /** Show the unassigned remainder of a cell as "Fold" in tooltips (preflop charts). */
   implicitFold?: boolean
+  /** Index (0-168) of a cell to outline, e.g. Hero's hand. */
+  highlight?: number
 }
 
 const CELLS = Array.from({ length: 169 }, (_, i) => i)
@@ -43,7 +45,7 @@ function describe(layers: Layer[], i: number, implicitFold: boolean): string {
   return `${handClassName(i)}: ${parts.join(', ')}`
 }
 
-export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = true }: Props) {
+export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = true, highlight }: Props) {
   const painting = useRef(false)
 
   useEffect(() => {
@@ -61,7 +63,13 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
         const label = describe(layers, i, implicitFold) + (extra ? ` · ${extra}` : '')
         const style = { background: background(layers, i) }
         const filled = layers.reduce((sum, { grid }) => sum + (grid[i] ?? 0), 0) >= 0.5
-        const className = filled ? 'matrix-cell matrix-cell-on' : 'matrix-cell'
+        const className = [
+          'matrix-cell',
+          filled ? 'matrix-cell-on' : '',
+          i === highlight ? 'matrix-cell-highlight' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
         if (!onPaint) {
           return (
             <span key={i} className={className} style={style} title={label}>

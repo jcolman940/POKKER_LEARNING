@@ -21,7 +21,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Poker Study' })).toBeInTheDocument()
     expect(await screen.findByText('Backend 0.1.0 · núcleo 0.1.0')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Simulador' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: /Entrenador/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Entrenador/ })).toBeEnabled()
   })
 
   it('reports when the backend is unreachable', async () => {

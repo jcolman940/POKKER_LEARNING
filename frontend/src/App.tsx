@@ -7,6 +7,7 @@ import { ChartsPage } from './ranges/ChartsPage'
 import { type InitialScenario, SimulatorPage } from './simulator/SimulatorPage'
 import { SolverPage } from './solver/SolverPage'
 import { StatsPage } from './stats/StatsPage'
+import { TrainerPage } from './trainer/TrainerPage'
 
 const SECTIONS = [
   { id: 'simulator', label: 'Simulador', phase: 2 },
@@ -19,7 +20,7 @@ const SECTIONS = [
   { id: 'trainer', label: 'Entrenador', phase: 6 },
 ] as const
 
-const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold', 'history', 'stats', 'replayer', 'solver'])
+const AVAILABLE = new Set<string>(['simulator', 'ranges', 'pushfold', 'history', 'stats', 'replayer', 'solver', 'trainer'])
 
 type BackendStatus =
   | { state: 'loading' }
@@ -99,6 +100,7 @@ export default function App() {
         {section === 'ranges' && <ChartsPage />}
         {section === 'pushfold' && <PushFoldPage />}
         {section === 'solver' && <SolverPage />}
+        {section === 'trainer' && <TrainerPage />}
       </main>
 
       <footer className="app-footer">

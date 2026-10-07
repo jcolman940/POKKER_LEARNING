@@ -3,7 +3,14 @@ export interface VersionInfo {
   core: string
 }
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status = 0) {
+    super(message)
+    this.status = status
+  }
+}
 
 // FastAPI reports errors as {detail: string} or, for validation errors,
 // {detail: [{msg: string, ...}]}.
@@ -22,7 +29,7 @@ function errorMessage(body: unknown, status: number): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, init)
   const body: unknown = resp.status === 204 ? null : await resp.json().catch(() => null)
-  if (!resp.ok) throw new ApiError(errorMessage(body, resp.status))
+  if (!resp.ok) throw new ApiError(errorMessage(body, resp.status), resp.status)
   return body as T
 }
 
