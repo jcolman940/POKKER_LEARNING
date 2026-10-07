@@ -58,6 +58,7 @@ class SessionIn(BaseModel):
     difficulty: int = Field(default=50, ge=0, le=100)
     payout_id: int | None = None
     card_ids: list[int] | None = None
+    prefer_due: bool = False
 
 
 class SessionOut(BaseModel):

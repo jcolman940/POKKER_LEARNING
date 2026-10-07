@@ -99,3 +99,17 @@ def test_unbuildable_spot_does_not_archive(db_session, monkeypatch):
         service.next_spot(db_session, review_ts.id, rng, now=LATER)
     db_session.refresh(card)
     assert card.archived is False
+
+
+def test_prefer_due_always_serves_the_due_card(db_session):
+    ts, rng, card = _answered_card(db_session)
+    plain = _start(db_session, mode="normal")
+    prefer = _start(db_session, mode="normal", prefer_due=True)
+    served_plain = []
+    for i in range(30):
+        attempt, served = service.next_spot(db_session, prefer.id, random.Random(i), now=LATER)
+        assert served.review is True and attempt.card_id == card.id
+    for i in range(30):
+        attempt, served = service.next_spot(db_session, plain.id, random.Random(i), now=LATER)
+        served_plain.append(served.review)
+    assert not all(served_plain)  # the 70/30 mix still serves new spots

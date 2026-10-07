@@ -79,6 +79,8 @@ def test_stack_bucket_edges():
     assert [stack_bucket(x, False) for x in (16, 30, 31, 60, 61, 120, 121)] == [
         "16-30", "16-30", "31-60", "31-60", "61-120", "61-120", "120+",
     ]  # fmt: skip
+    # Cash short stacks never pool with 30bb.
+    assert [stack_bucket(x, False) for x in (5, 15)] == ["≤15", "≤15"]
 
 
 def test_no_decisions_warns(db_session):
@@ -229,3 +231,41 @@ def test_vs_allin_nash_call_is_correct(db_session):
     g = all_groups(report)[0]
     assert report.leaks == [] and g.ev_loss_bb == 0 and not g.approximate
     assert next(a for a in g.actions if a.action == "call").observed == 1.0
+
+
+def test_mtt_10bb_chart_decision_uses_pushfold_buckets(db_session):
+    db_session.add(
+        PreflopChart(
+            name="BTN vs UTG",
+            source="custom",
+            game_format="mtt",
+            players=6,
+            position="BTN",
+            vs_position="LJ",
+            stack_bb=10.0,
+            situation="vs_open",
+            ante_bb=0.0,
+            note="",
+            actions={"call": [float(x) for x in range_vector(RANGE)]},
+        )
+    )
+    db_session.commit()
+    for i in range(60):
+        record = make_hand(
+            TEN,
+            [
+                act("p", "U", "raise", 2.0),
+                act("p", "H", "fold"),
+                act("p", "C", "fold"),
+                act("p", "Hero", "fold"),
+            ],
+            button="Hero",
+            hero_cards=cards(PREMIUMS[i % 6]),
+            hand_id=f"vo{i}",
+            game_type=GameFormat.MTT,
+        )
+        db_session.add(hand_row(record, "", None))
+    db_session.commit()
+    groups = all_groups(find_leaks(db_session, StatsFilter()))
+    assert [g.stack_bucket for g in groups] == ["9-11"]
+    assert groups[0].source == "chart"

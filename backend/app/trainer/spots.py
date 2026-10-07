@@ -38,13 +38,18 @@ class TrainerSpot:
     chart_id: int | None = None
 
 
+def hero_max() -> float:
+    """Highest hero stack for push/fold spots (recommend() routes anything above to charts)."""
+    return min(float(HERO_STACK[1]), get_settings().pushfold_max_bb)
+
+
 def pushfold_pool(table_size: int) -> list[list[float]]:
     """Fixed stack configurations for a table size (deterministic)."""
     rng = random.Random(table_size)
     pool: list[list[float]] = []
     for j in range(POOL_SIZE):
         stacks = [float(rng.randint(*OTHER_STACK)) for _ in range(table_size)]
-        stacks[j % table_size] = float(rng.randint(*HERO_STACK))
+        stacks[j % table_size] = min(float(rng.randint(*HERO_STACK)), hero_max())
         pool.append(stacks)
     return pool
 
@@ -124,7 +129,8 @@ def card_key(spot: TrainerSpot) -> str:
     vs = sc.villains[0].position if sc.situation == Situation.VS_ALLIN else None
     bucket = stack_bucket(sc.effective_stack_bb, True)
     head = f"pushfold|{sc.format.value}|{sc.hero_position}|{sc.situation.value}"
-    return f"{head}|{vs or '-'}|{bucket}|{cls}"
+    mode = "icm" if sc.payouts else "chip"
+    return f"{head}|{vs or '-'}|{bucket}|{mode}|{cls}"
 
 
 def _finish(spot: TrainerSpot) -> TrainerSpot:
@@ -145,7 +151,7 @@ def _pushfold_candidates(filters: dict, table: int) -> dict[Situation, list[tupl
     out: dict[Situation, list[tuple[int, int]]] = {Situation.RFI: [], Situation.VS_ALLIN: []}
     for ci, stacks in enumerate(pushfold_pool(table)):
         for hi, pos in enumerate(order):
-            if not HERO_STACK[0] <= stacks[hi] <= HERO_STACK[1]:
+            if not HERO_STACK[0] <= stacks[hi] <= hero_max():
                 continue
             if not _passes(filters, "positions", pos):
                 continue
@@ -174,8 +180,13 @@ def generate_pushfold(
     payouts: list[float],
     difficulty: int = DEFAULT_DIFFICULTY,
 ) -> TrainerSpot | None:
-    if filters.get("formats") and GameFormat.MTT.value not in filters["formats"]:
+    allowed = filters.get("formats") or []
+    formats = (
+        sorted(f for f in TOURNAMENT_FORMATS if f.value in allowed) if allowed else [GameFormat.MTT]
+    )
+    if not formats:
         return None
+    fmt = rng.choice(formats)
     tables = [t for t in PUSHFOLD_TABLES if _passes(filters, "table_sizes", t)]
     rng.shuffle(tables)
     for table in tables:
@@ -201,7 +212,7 @@ def generate_pushfold(
             rng, combos_per_class(), pushfold_frontier(ev_act, ev_fold, scale), difficulty
         )
         scenario = Scenario(
-            format=GameFormat.MTT,
+            format=fmt,
             num_players=table,
             hero_position=hero,
             hero_hand=hand,

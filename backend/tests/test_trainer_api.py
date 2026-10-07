@@ -280,3 +280,15 @@ def test_frequent_mode_serves_chosen_cards(client, seeded):
         assert spot["card_id"] in ids and spot["review"] is True
     none = client.post("/api/trainer/sessions", json={"sources": ["pushfold"], "mode": "frequent"})
     assert none.status_code == 422
+
+
+def test_session_accepts_prefer_due(client, seeded):
+    sid = _session(client, prefer_due=True)
+    assert (
+        client.post("/api/trainer/sessions", json={"sources": ["pushfold"]}).json()["filters"][
+            "prefer_due"
+        ]
+        is False
+    )
+    r = client.post(f"/api/trainer/sessions/{sid}/next")
+    assert r.status_code == 200

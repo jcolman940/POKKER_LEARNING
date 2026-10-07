@@ -276,6 +276,8 @@ def choose_spot(
     ]
     due.sort(key=lambda c: (aware(c.due_at), c.id))
     kind = pick_kind(rng, bool(due), bool(due_relearn))
+    if f.get("prefer_due") and kind == "new" and due:
+        kind = "due"  # the leaks bridge asks for overdue cards before new spots
     if mode == "review" and kind == "new":
         kind = "due"
     if kind == "relearn":

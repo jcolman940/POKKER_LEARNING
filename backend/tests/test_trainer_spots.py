@@ -236,3 +236,41 @@ def test_pushfold_nine_handed_vs_allin(db_session):
     order = preflop_order(9)
     assert order.index(sc.villains[0].position) < order.index(sc.hero_position)
     assert recommend(sc, db_session).source == "nash"
+
+
+def test_pushfold_bridge_for_sng_and_spin(db_session):
+    spot = generate_pushfold(
+        db_session, random.Random(2), {"formats": ["spin"], "table_sizes": [3]}, []
+    )
+    assert spot is not None and spot.scenario.format.value == "spin"
+    assert spot.card_key.startswith("pushfold|spin|")
+    assert recommend(spot.scenario, db_session).source == "nash"
+    seen = {
+        generate_pushfold(
+            db_session, random.Random(i), {"formats": ["cash", "sng", "spin"]}, []
+        ).scenario.format.value
+        for i in range(20)
+    }
+    assert seen == {"sng", "spin"}
+    assert generate_pushfold(db_session, random.Random(1), {"formats": ["cash"]}, []) is None
+
+
+def test_hero_stack_never_exceeds_pushfold_max(db_session, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setenv("POKER_PUSHFOLD_MAX_BB", "10")
+    get_settings.cache_clear()
+    for table in PUSHFOLD_TABLES:
+        assert all(c[j % table] <= 10 for j, c in enumerate(pushfold_pool(table)))
+    for i in range(30):
+        spot = generate_pushfold(db_session, random.Random(i), {}, [])
+        assert spot is not None and spot.scenario.effective_stack_bb <= 10
+        assert recommend(spot.scenario, db_session).source == "nash"
+
+
+def test_pushfold_card_key_separates_icm_from_chip_ev(db_session):
+    chip = generate_pushfold(db_session, random.Random(4), {}, [])
+    icm = generate_pushfold(db_session, random.Random(4), {}, [50.0, 30.0, 20.0])
+    assert chip.scenario.hero_position == icm.scenario.hero_position
+    assert chip.card_key != icm.card_key
+    assert "|chip|" in chip.card_key and "|icm|" in icm.card_key

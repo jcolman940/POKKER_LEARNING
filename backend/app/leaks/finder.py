@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import Hand, HandDecision
-from app.domain.scenario import Situation
+from app.domain.scenario import TOURNAMENT_FORMATS, GameFormat, Situation
 from app.leaks.reference import Reference, ReferenceBuilder
 from app.recommend.preflop_equity import class_index
 from app.stats.engine import StatsFilter, wilson
@@ -19,7 +19,7 @@ from app.stats.engine import StatsFilter, wilson
 MIN_DIFF = 0.05
 INF = float("inf")
 PUSHFOLD_BUCKETS = ((5, "3-5"), (8, "6-8"), (11, "9-11"), (INF, "12-15"))
-DEEP_BUCKETS = ((30, "16-30"), (60, "31-60"), (120, "61-120"), (INF, "120+"))
+DEEP_BUCKETS = ((15, "≤15"), (30, "16-30"), (60, "31-60"), (120, "61-120"), (INF, "120+"))
 SITUATION_LABEL = {
     Situation.RFI: "RFI",
     Situation.VS_OPEN: "vs open",
@@ -204,7 +204,11 @@ def _analyze(session: Session, filters: StatsFilter):
                 unresolved += 1
             continue
         ref, source = resolved
-        bucket = stack_bucket(d.stack_bb, source == "nash")
+        pushfold = (
+            GameFormat(d.game_format) in TOURNAMENT_FORMATS
+            and d.stack_bb <= get_settings().pushfold_max_bb
+        )
+        bucket = stack_bucket(d.stack_bb, pushfold)
         acc = accs.setdefault(_key(d, bucket, source), _Acc(d=d, bucket=bucket, source=source))
         done = ref.map_action(d.action)
         acc.items.append(
