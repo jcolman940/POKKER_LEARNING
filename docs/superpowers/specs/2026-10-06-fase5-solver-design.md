@@ -28,6 +28,7 @@ Obtenidos corriendo el binario real el 2026-10-06; el código se escribe contra 
   - **`player 1` = OOP, `player 0` = IP.**
   - Los montos de acción vienen **redondeados a enteros** en fichas (`BET 7.000000` para 33% de 20) → se escala ×100.
   - La estrategia está por **combo exacto** (`"7h6h"`); no hay EV en la salida.
+  - **Los rangos de entrada solo aceptan clases** (`AKs`, `KJo:0.5`): un combo puntual (`AcKc`) aborta con `range str AcKc len not valid` y código 3. Los rangos se convierten a peso promedio por clase; si un rango tenía pesos distintos dentro de una clase, el resultado se marca "aproximado".
 - Tiempos medidos (6 núcleos): turn chico 1,4 s de solve + ~17 s de arranque fijo; flop con rangos realistas ~107 s de solve, 121 s total, explotabilidad 0,49% del pote. `dump_rounds 1` (solo la calle actual) deja el flop en ~177 KB; `dump_rounds 2` en turn ~6,6 MB.
 
 ## 3. Arquitectura
@@ -53,7 +54,7 @@ Obtenidos corriendo el binario real el 2026-10-06; el código se escribe contra 
 
 ### 3.3 Cambios en código existente
 
-- `Scenario`: campo `hero_range: str | None`, `pot_type: "srp" | "3bet" | None` y `solver_preset: str | None`. Quién está en posición se deduce de las posiciones (orden postflop).
+- `Scenario`: campos `hero_range: str | None`, `ranges_approximate: bool` (lo marca la UI si los rangos salieron de tablas aproximadas) y `solver_preset: str`. El tipo de pote solo lo usa el pedido de prellenado, no el `Scenario`. Quién está en posición se deduce de las posiciones (orden postflop).
 - `RecommendationOut`: campo opcional `pending_job` (id, estado, progreso) y `strategy_grid` (169 clases → mezcla de acciones) para la UI.
 - `recommend()`: postflop deriva a solver (HU) o heurística (multiway) en lugar del mensaje "fase 5".
 - `config.py`: `POKER_SOLVER_PATH` (ya existe), `POKER_SOLVER_THREADS` (default: núcleos), `POKER_SOLVER_TIMEOUT_MIN` (30), umbrales de la heurística.
@@ -127,7 +128,7 @@ Familias en `data/solver/library.json`:
 - **MTT 25 y 40 bb**: BTN vs BB, CO vs BB, SB vs BB (SRP); BB vs BTN 3-bet pot a 40 bb.
 - **Cash 6-max 100 bb**: BTN vs BB, CO vs BB, SB vs BB (SRP); SB vs BTN 3-bet pot.
 
-Flops: subconjunto fijo de **25 flops** elegido por un algoritmo reproducible que cubre texturas (alto/medio/bajo, monótono/dos palos/arcoíris, pareado, conectado). 13 líneas × 25 flops = 325 solves (~11 h con `simple`, ~4 h con `chico`); se encola por familia. Prioridad 20.
+Flops: subconjunto fijo de **25 flops** elegido por un algoritmo reproducible que cubre texturas (alto/medio/bajo, monótono/dos palos/arcoíris, pareado, conectado). 11 líneas (7 MTT + 4 cash) × 25 flops = 275 solves (~9 h con `simple`, ~3,5 h con `chico`); se encola por familia. Prioridad 20.
 
 - Rangos desde las tablas del usuario al encolar; el pote sale del sizing y el ante de esas tablas.
 - Línea sin tabla → "falta tabla: <posición> <situación> <stack> (<formato>)", no se encola. No se inventan rangos.
