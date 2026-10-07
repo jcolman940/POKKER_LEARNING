@@ -63,7 +63,7 @@ class Scenario(BaseModel):
     # prefill it (and the villain's) from the preflop charts, flagging approximations.
     hero_range: str | None = None
     ranges_approximate: bool = False
-    solver_preset: str = "simple"
+    solver_preset: str = "chico"
     board: str = ""
     pot_bb: Amount = 0.0
     to_call_bb: Amount = 0.0

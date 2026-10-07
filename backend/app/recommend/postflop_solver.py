@@ -14,7 +14,7 @@ from app.recommend.schemas import ActionOut, PendingJobOut, RecommendationOut, S
 from app.simulator.outs import showdown_share
 from app.solver.cache import CachedResult, get_result
 from app.solver.output_parser import StrategyNode, canonical_combo, find_hero_node
-from app.solver.queue import Origin, enqueue, queue_position
+from app.solver.queue import JobStatus, Origin, enqueue, is_paused, queue_position
 from app.solver.spot import Side, SolverSpot, facing_pct, to_solver_range
 from app.solver.trees import get_preset
 from app.solver.worker_registry import solver_available
@@ -47,6 +47,11 @@ def build_solver_spot(scenario: Scenario) -> BuiltSpot:
         )
     hero_r = to_solver_range(scenario.hero_range)
     villain_r = to_solver_range(scenario.villains[0].range)
+    dead = scenario.board + scenario.hero_hand
+    if not pokercore.range_combos(hero_r.text, dead):
+        raise ValueError("El rango de Hero queda vacío con las cartas conocidas.")
+    if not pokercore.range_combos(villain_r.text, dead):
+        raise ValueError("El rango del rival queda vacío con las cartas conocidas.")
     approximated = []
     if hero_r.approximated:
         approximated.append(
@@ -166,6 +171,13 @@ def recommend_solver(scenario: Scenario, session: Session) -> RecommendationOut:
             "console_solver.exe de TexasSolver."
         )
     job = enqueue(session, built.spot, Origin.SIMULATOR)
+    if job.status == JobStatus.DONE:  # the solve finished between get_result and enqueue
+        cached = get_result(session, built.spot.spot_hash())
+        if cached is not None:
+            try:
+                return _from_cache(scenario, built, cached)
+            except ValueError as e:
+                return _unavailable(str(e))
     return RecommendationOut(
         available=False,
         source="solver",
@@ -176,5 +188,6 @@ def recommend_solver(scenario: Scenario, session: Session) -> RecommendationOut:
             iteration=job.iteration,
             exploitability=job.exploitability,
             position=queue_position(session, job),
+            paused=is_paused(session),
         ),
     )

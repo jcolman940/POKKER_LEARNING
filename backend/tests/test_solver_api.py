@@ -161,3 +161,45 @@ def test_simulator_postflop_without_solver(client):
     ).json()
     assert r["recommendation"]["available"] is False
     assert "POKER_SOLVER_PATH" in r["recommendation"]["message"]
+
+
+def test_status_reports_solver_version(client):
+    from app.solver.spot import SOLVER_VERSION
+
+    assert client.get("/api/solver/status").json()["version"] == SOLVER_VERSION
+
+
+def test_job_reports_paused(client):
+    with _session_factory()() as s:
+        job_id = enqueue(s, river_spot(), Origin.SIMULATOR).id
+    assert client.get(f"/api/solver/jobs/{job_id}").json()["paused"] is False
+    client.post("/api/solver/queue/pause")
+    assert client.get(f"/api/solver/jobs/{job_id}").json()["paused"] is True
+
+
+def _batch_body(flops):
+    return {
+        "game_format": "cash",
+        "players": 6,
+        "line": {
+            "aggressor": "BTN",
+            "caller": "BB",
+            "pot_type": "srp",
+            "stack_bb": 100,
+            "open_size_bb": 2.5,
+        },
+        "flops": flops,
+    }
+
+
+def test_batch_rejects_invalid_cards(client):
+    for bad in (["AhKdXx"], ["AhAh2c"], ["AhKd2c3d"]):
+        r = client.post("/api/solver/batch", json=_batch_body(bad))
+        assert r.status_code == 422, bad
+        assert "Flop inválido" in str(r.json())
+
+
+def test_batch_default_preset_is_chico():
+    from app.api.solver import BatchIn
+
+    assert BatchIn.model_fields["preset"].default == "chico"

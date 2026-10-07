@@ -274,3 +274,36 @@ def test_queue_position_none_when_missing(db_session):
     db_session.expunge(job)
     job.id = 12345  # stale id not present in the queue
     assert queue_position(db_session, job) is None
+
+
+def test_queue_positions_single_query(db_session):
+    from app.solver.queue import queue_positions
+
+    a = enqueue(db_session, spot(20), Origin.LIBRARY)
+    b = enqueue(db_session, spot(21), Origin.SIMULATOR)
+    assert queue_positions(db_session) == {b.id: 1, a.id: 2}
+
+
+def test_run_once_skips_job_no_longer_queued(db_session, worker, fake, monkeypatch):
+    # Another actor (cancel) takes the job between next_job() and the RUNNING update.
+    job = enqueue(db_session, spot(20), Origin.BATCH)
+    other = enqueue(db_session, spot(21), Origin.LIBRARY)
+    from app.solver import queue as qmod
+
+    real_next = qmod.next_job
+    calls = []
+
+    def racing_next(session):
+        found = real_next(session)
+        if not calls:
+            calls.append(1)
+            cancel_job(db_session, job.id)
+        return found
+
+    monkeypatch.setattr(qmod, "next_job", racing_next)
+    assert worker.run_once() is True  # skipped the stale job, the loop continues
+    db_session.refresh(job)
+    assert job.status == JobStatus.CANCELLED
+    assert worker.run_once() is True
+    db_session.refresh(other)
+    assert other.status == JobStatus.DONE

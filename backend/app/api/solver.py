@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_session
 from app.db.models import SolverJob
+from app.domain.cards import parse_cards
 from app.domain.scenario import GameFormat
 from app.recommend.ranges_prefill import PotType, PrefillQuery, prefill_ranges
 from app.recommend.schemas import StrategyLayerOut
@@ -25,6 +26,7 @@ from app.solver.library import (
     load_library,
 )
 from app.solver.output_parser import canonical_combo
+from app.solver.spot import SOLVER_VERSION
 from app.solver.trees import load_presets
 from app.solver.worker_registry import solver_available
 
@@ -42,13 +44,19 @@ class JobOut(BaseModel):
     exploitability: float | None
     error: str | None
     position: int | None
+    paused: bool
     spot_hash: str
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
 
 
-def _job_out(session: Session, job: SolverJob) -> JobOut:
+def _job_out(
+    session: Session,
+    job: SolverJob,
+    positions: dict[int, int] | None = None,
+    paused: bool | None = None,
+) -> JobOut:
     return JobOut(
         id=job.id,
         label=job.label,
@@ -58,7 +66,8 @@ def _job_out(session: Session, job: SolverJob) -> JobOut:
         iteration=job.iteration,
         exploitability=job.exploitability,
         error=job.error,
-        position=q.queue_position(session, job),
+        position=q.queue_position(session, job, positions),
+        paused=q.is_paused(session) if paused is None else paused,
         spot_hash=job.spot_hash,
         created_at=job.created_at,
         started_at=job.started_at,
@@ -79,6 +88,7 @@ def status(session: DbSession) -> dict:
     entries, size = cache_stats(session)
     return {
         "configured": solver_available(),
+        "version": SOLVER_VERSION,
         "path": str(s.solver_path) if s.solver_path else None,
         "threads": s.solver_threads,
         "paused": q.is_paused(session),
@@ -100,7 +110,9 @@ def jobs(session: DbSession, status: str | None = None) -> list[JobOut]:
         active_query.order_by(SolverJob.status.desc(), SolverJob.priority, SolverJob.id)
     ).all()
     done = session.scalars(done_query.order_by(SolverJob.id.desc()).limit(50)).all()
-    return [_job_out(session, j) for j in [*active, *done]]
+    positions = q.queue_positions(session)
+    paused = q.is_paused(session)
+    return [_job_out(session, j, positions, paused) for j in [*active, *done]]
 
 
 @router.get("/jobs/{job_id}", response_model=JobOut)
@@ -173,7 +185,7 @@ class BatchIn(BaseModel):
     game_format: GameFormat
     players: int = Field(ge=2, le=10)
     ante_total_bb: float = Field(default=0.0, ge=0)
-    preset: str = "simple"
+    preset: str = "chico"
     line: BatchLine
     flops: list[str] | None = None
 
@@ -191,10 +203,13 @@ def batch(body: BatchIn, session: DbSession) -> dict:
         lines=[line],
     )
     flops = [f.replace(" ", "") for f in body.flops] if body.flops else None
-    if flops:
-        for f in flops:
-            if len(f) != 6:
-                raise ValueError(f"Flop inválido: {f}")
+    for f in flops or []:
+        try:
+            cards = parse_cards(f)
+        except ValueError:
+            cards = []
+        if len(cards) != 3 or len(set(cards)) != 3:
+            raise HTTPException(422, f"Flop inválido: {f} (3 cartas distintas, p. ej. AhKd2c)")
     missing = build_line_spots(session, family, line, flops or ["AhKd2c"]).missing
     enqueued = 0 if missing else enqueue_line(session, family, line, flops, q.Origin.BATCH)
     return {"enqueued": enqueued, "missing": missing}

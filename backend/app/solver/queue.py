@@ -99,11 +99,20 @@ def next_job(session: Session) -> SolverJob | None:
     return session.scalars(_queued(session).limit(1)).first()
 
 
-def queue_position(session: Session, job: SolverJob) -> int | None:
+def queue_positions(session: Session) -> dict[int, int]:
+    """Queue place (1 = next) of every queued job, in one query."""
+    ids = session.scalars(_queued(session).with_only_columns(SolverJob.id))
+    return {job_id: i for i, job_id in enumerate(ids, start=1)}
+
+
+def queue_position(
+    session: Session, job: SolverJob, positions: dict[int, int] | None = None
+) -> int | None:
     if job.status != JobStatus.QUEUED:
         return None
-    ids = list(session.scalars(_queued(session).with_only_columns(SolverJob.id)))
-    return ids.index(job.id) + 1 if job.id in ids else None
+    if positions is None:
+        positions = queue_positions(session)
+    return positions.get(job.id)
 
 
 def _get(session: Session, job_id: int) -> SolverJob:
@@ -237,11 +246,16 @@ class SolverWorker:
             job = next_job(session)
             if job is None:
                 return False
-            job.status = JobStatus.RUNNING
-            job.started_at = _now()
-            job.iteration = 0
-            session.commit()
             job_id = job.id
+            # Conditional: a cancel may land between next_job() and this write.
+            changed = session.execute(
+                update(SolverJob)
+                .where(SolverJob.id == job_id, SolverJob.status == JobStatus.QUEUED)
+                .values(status=JobStatus.RUNNING, started_at=_now(), iteration=0)
+            ).rowcount
+            session.commit()
+            if not changed:
+                return True  # skip it; the loop picks the next job
         try:
             self._execute(job_id)
         except Exception as e:  # never leave a job RUNNING

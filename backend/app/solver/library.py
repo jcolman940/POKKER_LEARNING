@@ -21,7 +21,7 @@ from app.domain.positions import postflop_order
 from app.domain.scenario import GameFormat
 from app.recommend.ranges_prefill import PotType, PrefillQuery, prefill_ranges
 from app.solver.flops import representative_flops
-from app.solver.queue import ACTIVE, JobStatus, Origin, enqueue
+from app.solver.queue import ACTIVE, Origin, enqueue
 from app.solver.spot import SolverSpot, to_solver_range
 from app.solver.trees import get_preset
 
@@ -45,7 +45,7 @@ class Family(BaseModel):
     game_format: GameFormat
     players: int
     ante_total_bb: float = 0.0
-    preset: str = "simple"
+    preset: str = "chico"
     lines: list[LineSpec]
 
 
@@ -131,8 +131,17 @@ def enqueue_line(
     built = build_line_spots(session, family, line, flops or representative_flops())
     count = 0
     for flop, spot in built.spots.items():
-        job = enqueue(session, spot, origin, library_key(family.id, line.id, flop))
-        count += job.status != JobStatus.DONE
+        h = spot.spot_hash()
+        if session.get(SolverResult, h) is not None:
+            continue  # already solved: no DONE row that would flood the job list
+        already_active = (
+            session.scalars(
+                select(SolverJob.id).where(SolverJob.spot_hash == h, SolverJob.status.in_(ACTIVE))
+            ).first()
+            is not None
+        )
+        enqueue(session, spot, origin, library_key(family.id, line.id, flop))
+        count += not already_active
     return count
 
 

@@ -6,7 +6,7 @@
       "game_format": "mtt",
       "players": 9,
       "ante_total_bb": 1.0,
-      "preset": "simple",
+      "preset": "chico",
       "lines": [
         {"id": "btn_bb_25", "label": "BTN vs BB · SRP · 25bb", "aggressor": "BTN", "caller": "BB", "pot_type": "srp", "stack_bb": 25, "open_size_bb": 2.0},
         {"id": "co_bb_25", "label": "CO vs BB · SRP · 25bb", "aggressor": "CO", "caller": "BB", "pot_type": "srp", "stack_bb": 25, "open_size_bb": 2.0},
@@ -23,7 +23,7 @@
       "game_format": "cash",
       "players": 6,
       "ante_total_bb": 0.0,
-      "preset": "simple",
+      "preset": "chico",
       "lines": [
         {"id": "btn_bb", "label": "BTN vs BB · SRP", "aggressor": "BTN", "caller": "BB", "pot_type": "srp", "stack_bb": 100, "open_size_bb": 2.5},
         {"id": "co_bb", "label": "CO vs BB · SRP", "aggressor": "CO", "caller": "BB", "pot_type": "srp", "stack_bb": 100, "open_size_bb": 2.5},

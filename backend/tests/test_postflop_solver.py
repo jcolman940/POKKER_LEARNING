@@ -156,3 +156,54 @@ def test_oop_hero_facing_bet_after_check(db_session):
 def test_facing_all_in_has_no_bet_size():
     built = build_solver_spot(scenario(pot_bb=100.0, to_call_bb=90.0))
     assert built.spot.bettor is None and built.spot.facing_bet_pct is None
+
+
+def test_pending_job_reports_paused(db_session, monkeypatch):
+    from app.solver.queue import set_paused
+
+    monkeypatch.setattr("app.recommend.postflop_solver.solver_available", lambda: True)
+    set_paused(db_session, True)
+    rec = recommend_solver(scenario(), db_session)
+    assert rec.pending_job.paused is True
+    set_paused(db_session, False)
+    rec = recommend_solver(scenario(), db_session)
+    assert rec.pending_job.paused is False
+
+
+def test_done_job_from_race_returns_cached_recommendation(db_session, monkeypatch):
+    monkeypatch.setattr("app.recommend.postflop_solver.solver_available", lambda: True)
+    real_enqueue = __import__("app.solver.queue", fromlist=["enqueue"]).enqueue
+
+    def racing_enqueue(session, spot, origin, *a, **kw):
+        cache_river(session)  # the solve finishes right before the enqueue
+        return real_enqueue(session, spot, origin, *a, **kw)
+
+    monkeypatch.setattr("app.recommend.postflop_solver.enqueue", racing_enqueue)
+    rec = recommend_solver(scenario(), db_session)
+    assert rec.available and rec.pending_job is None
+
+
+def test_empty_hero_range_after_known_cards():
+    with pytest.raises(ValueError, match="El rango de Hero queda vacío"):
+        build_solver_spot(scenario(hero_range="QhQc", hero_hand="QhQc"))
+
+
+def test_empty_villain_range_after_known_cards():
+    with pytest.raises(ValueError, match="El rango del rival queda vacío"):
+        build_solver_spot(
+            scenario(
+                board="AsAh2c7d3d",
+                hero_hand="AdAc",
+                hero_range="AA,KK",
+                villains=[Villain(position="BTN", range="AA")],
+            )
+        )
+
+
+def test_empty_range_is_unavailable(db_session):
+    rec = recommend_solver(scenario(hero_range="QhQc", hero_hand="QhQc"), db_session)
+    assert not rec.available and "queda vacío" in rec.message
+
+
+def test_default_preset_is_chico():
+    assert scenario().solver_preset == "chico"

@@ -19,6 +19,7 @@ class PendingJobOut(BaseModel):
     iteration: int
     exploitability: float | None
     position: int | None  # place in the queue (1 = next), None when running
+    paused: bool = False  # queue paused: nothing runs until it is resumed
 
 
 class StrategyLayerOut(BaseModel):

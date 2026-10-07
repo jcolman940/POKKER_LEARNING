@@ -96,3 +96,25 @@ def test_outdated_when_chart_changes(db_session, cash):
     line_status = next(lst for lst in status[0]["lines"] if lst["id"] == "btn_bb")
     entry = next(e for e in line_status["entries"] if e["flop"] == FLOP)
     assert entry["status"] == "outdated"
+
+
+def test_enqueue_line_skips_cached_spots_without_rows(db_session, cash):
+    from app.solver.cache import store_result
+    from app.solver.output_parser import SolverAction, StrategyNode
+    from app.solver.runner import Progress
+
+    add_cash_btn_bb_charts(db_session)
+    fam, line = cash
+    spots = build_line_spots(db_session, fam, line, [FLOP, "7s7h2d"]).spots
+    tree = StrategyNode("oop", [SolverAction("check")], {"AsAd": [1.0]})
+    store_result(db_session, spots[FLOP], tree, Progress(), 1.0)
+    assert enqueue_line(db_session, fam, line, [FLOP, "7s7h2d"]) == 1
+    assert db_session.query(SolverJob).count() == 1  # no DONE row for the cached flop
+
+
+def test_enqueue_line_counts_only_new_jobs(db_session, cash):
+    add_cash_btn_bb_charts(db_session)
+    fam, line = cash
+    assert enqueue_line(db_session, fam, line, [FLOP, "7s7h2d"]) == 2
+    assert enqueue_line(db_session, fam, line, [FLOP, "7s7h2d"]) == 0
+    assert db_session.query(SolverJob).count() == 2
