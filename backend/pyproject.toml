@@ -21,6 +21,10 @@ dev = [
     "httpx>=0.27",
     "ruff>=0.6",
 ]
+# Only for scripts\package.ps1 (uv sync --group package): freezes the server with PyInstaller.
+package = [
+    "pyinstaller>=6",
+]
 
 [tool.uv.sources]
 pokercore = { path = "../core" }
