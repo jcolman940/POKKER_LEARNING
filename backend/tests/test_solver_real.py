@@ -11,7 +11,8 @@ SOLVER = os.environ.get("POKER_SOLVER_PATH")
 pytestmark = [
     pytest.mark.solver,
     pytest.mark.skipif(
-        not SOLVER or not Path(SOLVER).is_file(), reason="POKER_SOLVER_PATH no definido"
+        not SOLVER or not Path(SOLVER).is_file(),
+        reason="POKER_SOLVER_PATH no definido o no apunta a un archivo",
     ),
 ]
 

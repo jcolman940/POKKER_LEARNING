@@ -45,7 +45,9 @@ jobs:
 
       - name: Point the backend at TexasSolver
         run: |
-          "POKER_SOLVER_PATH=$env:RUNNER_TEMP\TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe" | Out-File -Append $env:GITHUB_ENV
+          $exe = Join-Path $env:RUNNER_TEMP 'TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe'
+          if (-not (Test-Path $exe)) { throw "TexasSolver no encontrado en $exe" }
+          "POKER_SOLVER_PATH=$exe" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       - name: Backend
         run: scripts/test.ps1 backend
