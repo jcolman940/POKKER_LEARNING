@@ -36,12 +36,17 @@ def sha_file(sha: str, bom: bool) -> bytes:
     return (BOM if bom else b"") + sha.encode("ascii")
 
 
-@pytest.mark.parametrize("bom", [False, True], ids=["sha256-plain", "sha256-with-bom"])
+@pytest.mark.parametrize(
+    ("bom", "with_db"),
+    [(False, True), (True, True), (False, False)],
+    ids=["sha256-plain", "sha256-with-bom", "no-database"],
+)
 def test_update_without_asking_replaces_app_and_launcher(
-    install: Install, new_package: NewPackage, old_version: str, bom: bool
+    install: Install, new_package: NewPackage, old_version: str, bom: bool, with_db: bool
 ) -> None:
     install.feed.publish(NEW_VERSION, new_package.zip_path, sha_file(new_package.sha, bom))
-    install.make_database()
+    if with_db:
+        install.make_database()
 
     proc = install.start("--permitir-feed-local", "--actualizar-sin-preguntar", CLOSE_AFTER)
     # The relaunched (new) POKKER.exe starts the server: it must report the new version.
@@ -57,7 +62,10 @@ def test_update_without_asking_replaces_app_and_launcher(
     assert "POKKER.exe nuevo copiado" in log
     assert f"--actualizado={NEW_VERSION}" in log  # the new launcher was started with it
     assert f"Globito: POKKER se actualizó a {NEW_VERSION}" in log
-    assert "Copia de la base en" in log
+    if with_db:
+        assert "Copia de la base en" in log
+    else:
+        assert "No hay base de datos todavía: no hago copia" in log
     assert log.count("=== POKKER cerrado") == 1  # only the relaunched one ran the server
 
     assert install.version() == NEW_VERSION
@@ -67,11 +75,14 @@ def test_update_without_asking_replaces_app_and_launcher(
     assert not list((install.data / "updates").glob("*")), "the download must be removed"
 
     backup = install.data / "datos.anterior" / "poker.sqlite3"
-    assert backup.is_file()
-    with sqlite3.connect(backup) as db:
-        rows = db.execute("SELECT v FROM pokker_test_marker").fetchall()
-    db.close()
-    assert rows == [("antes de actualizar",)]
+    if with_db:
+        assert backup.is_file()
+        with sqlite3.connect(backup) as db:
+            rows = db.execute("SELECT v FROM pokker_test_marker").fetchall()
+        db.close()
+        assert rows == [("antes de actualizar",)]
+    else:
+        assert not (install.data / "datos.anterior").exists()
 
     # Everything is down: no process from this copy, no running.json.
     assert not processes_under(install.base)
@@ -92,6 +103,32 @@ def test_bad_hash_rolls_back_completely(
     assert "la descarga está dañada" in log
     assert "Actualización fallida" in log and "vuelta atrás" in log
     assert f"Versión de la app: {old_version}" in log  # kept going with the old one
+    assert "POKKER listo en" in log
+
+    assert install.version() == old_version
+    assert sha256_upper(install.exe) == exe_before
+    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo"):
+        assert not (install.root / leftover).exists(), leftover
+    assert not list((install.data / "updates").glob("*"))
+    assert not (install.data / "datos.anterior").exists()
+    assert not processes_under(install.base)
+
+
+def test_package_without_version_rolls_back_after_unpacking(
+    install: Install, package_without_version: NewPackage, old_version: str
+) -> None:
+    pkg = package_without_version
+    install.feed.publish(NEW_VERSION, pkg.zip_path, sha_file(pkg.sha, bom=False))
+    install.make_database()
+    exe_before = sha256_upper(install.exe)
+
+    install.run("--permitir-feed-local", "--actualizar-sin-preguntar", CLOSE_AFTER)
+
+    log = install.log()
+    assert "SHA-256 verificado" in log  # it got past the download and the hash check
+    assert "el paquete nuevo no trae app\\VERSION" in log
+    assert "Actualización fallida" in log and "vuelta atrás" in log
+    assert f"Versión de la app: {old_version}" in log
     assert "POKKER listo en" in log
 
     assert install.version() == old_version

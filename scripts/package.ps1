@@ -9,7 +9,8 @@
 #   6. smoke test on a temp copy with a temp --datos (never %LOCALAPPDATA%\POKKER)
 #   7. dist\POKKER-X.Y.Z.zip + dist\POKKER-X.Y.Z.zip.sha256 (uppercase hex, no BOM)
 #
-# Loads the MSVC dev shell when cl.exe is not on PATH and prepends uv's folder when uv is missing.
+# When cl.exe is not on PATH, loads the MSVC dev shell found with vswhere (or warns and goes on:
+# CMake finds MSVC itself); prepends uv's folder when uv is missing.
 param(
     [string]$Version,
     [switch]$SkipTests
@@ -20,7 +21,6 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Build = Join-Path $Root 'build'
 $Dist = Join-Path $Root 'dist'
 $Feed = 'https://api.github.com/repos/jcolman940/POKKER_LEARNING/releases/latest'
-$VsDevShell = 'C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\Launch-VsDevShell.ps1'
 $UvDir = Join-Path $env:APPDATA 'Python\Python314\Scripts'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
@@ -34,16 +34,32 @@ function Invoke-Checked {
     if ($LASTEXITCODE -ne 0) { Fail "$What fallo (codigo $LASTEXITCODE)" }
 }
 
+function Find-VsDevShell {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (-not (Test-Path $vswhere)) { return $null }
+    $install = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    if ($LASTEXITCODE -ne 0 -or -not $install) { return $null }
+    $shell = Join-Path (@($install)[0].Trim()) 'Common7\Tools\Launch-VsDevShell.ps1'
+    if (Test-Path $shell) { return $shell }
+    return $null
+}
+
 function Initialize-Toolchain {
+    # cl.exe on PATH is a convenience, not a requirement: CMake's Visual Studio generator and
+    # scikit-build find MSVC by themselves (e.g. on GitHub's windows-latest).
     if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
-        if (-not (Test-Path $VsDevShell)) { Fail "no hay cl.exe en el PATH ni $VsDevShell" }
-        Write-Host "Cargando el entorno de MSVC ($VsDevShell)"
-        # The dev shell prints a harmless "vswhere.exe not recognized" error: do not stop on it.
-        $prev = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try { & $VsDevShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation 2>$null | Out-Null }
-        finally { $ErrorActionPreference = $prev }
-        if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { Fail 'no pude cargar el entorno de MSVC (cl.exe)' }
+        $devShell = Find-VsDevShell
+        if ($devShell) {
+            Write-Host "Cargando el entorno de MSVC ($devShell)"
+            # The dev shell may print a harmless "vswhere.exe not recognized" error: do not stop on it.
+            $prev = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try { & $devShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation 2>$null | Out-Null }
+            finally { $ErrorActionPreference = $prev }
+        }
+        if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
+            Write-Warning 'cl.exe no esta en el PATH (no encontre el entorno de MSVC con vswhere): sigo, CMake busca el compilador solo.'
+        }
     }
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
         $env:Path = "$UvDir;$env:Path"

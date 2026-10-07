@@ -230,9 +230,19 @@ def old_version() -> str:
     return (DIST / "app" / "VERSION").read_text(encoding="utf-8").strip()
 
 
+def _zip_package(staging: Path, zip_path: Path, skip: frozenset[str] = frozenset()) -> Path:
+    """Zips staging like package.ps1: '/' names under a POKKER/ top folder."""
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        for file in sorted(p for p in staging.rglob("*") if p.is_file()):
+            rel = file.relative_to(staging).as_posix()
+            if rel not in skip:
+                zf.write(file, "POKKER/" + rel)
+    return zip_path
+
+
 @pytest.fixture(scope="session")
-def new_package(tmp_path_factory: pytest.TempPathFactory) -> NewPackage:
-    """dist\\POKKER as version 9.9.9, zipped like package.ps1 ('/' names under POKKER/).
+def new_staging(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """dist\\POKKER as version 9.9.9 (unzipped).
 
     Its POKKER.exe gets a few trailing bytes (ignored by the PE loader) so the update also
     exercises the "new launcher" path: POKKER.exe -> POKKER.exe.viejo + relaunch.
@@ -242,11 +252,25 @@ def new_package(tmp_path_factory: pytest.TempPathFactory) -> NewPackage:
     (staging / "app" / "VERSION").write_text(NEW_VERSION + "\n", encoding="utf-8", newline="\n")
     with (staging / "POKKER.exe").open("ab") as f:
         f.write(b"\0POKKER-test-9.9.9\0")
-    zip_path = staging.parent / f"POKKER-{NEW_VERSION}.zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
-        for file in sorted(p for p in staging.rglob("*") if p.is_file()):
-            zf.write(file, "POKKER/" + file.relative_to(staging).as_posix())
-    return NewPackage(zip_path, sha256_upper(zip_path), sha256_upper(staging / "POKKER.exe"))
+    return staging
+
+
+@pytest.fixture(scope="session")
+def new_package(new_staging: Path) -> NewPackage:
+    """POKKER-9.9.9.zip of new_staging."""
+    zip_path = _zip_package(new_staging, new_staging.parent / f"POKKER-{NEW_VERSION}.zip")
+    return NewPackage(zip_path, sha256_upper(zip_path), sha256_upper(new_staging / "POKKER.exe"))
+
+
+@pytest.fixture(scope="session")
+def package_without_version(new_staging: Path) -> NewPackage:
+    """A 9.9.9 zip with a valid hash that lacks app/VERSION: fails after unpacking."""
+    folder = new_staging.parent / "sin-version"
+    folder.mkdir()
+    zip_path = _zip_package(
+        new_staging, folder / f"POKKER-{NEW_VERSION}.zip", frozenset({"app/VERSION"})
+    )
+    return NewPackage(zip_path, sha256_upper(zip_path), sha256_upper(new_staging / "POKKER.exe"))
 
 
 # ---------------------------------------------------------------------------------- installs
@@ -385,8 +409,14 @@ def deny_write(install: Install) -> Iterator[str]:
         yield account
     finally:
         kill_under(install.base)  # before restoring: nothing may hold the folder
-        subprocess.run(
+        res = subprocess.run(
             ["icacls", target, "/remove:d", account, "/T", "/C", "/Q"],
             capture_output=True,
+            text=True,
             check=False,
         )
+        if res.returncode != 0:
+            pytest.fail(
+                f"icacls could not remove the deny entry from {target} "
+                f"(code {res.returncode}): {res.stdout.strip()} {res.stderr.strip()}"
+            )

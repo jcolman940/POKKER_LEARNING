@@ -6,19 +6,26 @@ on:
   push:
     tags: ['v*']
 
+# Least privilege: the build (tests + package) only reads; only the publish job may write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
+    permissions:
+      contents: read
     defaults:
       run:
         shell: pwsh
     env:
       TAG: ${{ github.ref_name }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Tag matches VERSION
         id: version
@@ -95,12 +102,6 @@ jobs:
       - name: Integration
         run: scripts/test.ps1 integration
 
-      # package.ps1 needs cl.exe on PATH (it only knows the local VS Build Tools path otherwise).
-      - name: MSVC environment for packaging
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64
-
       - name: Package (PyInstaller server + launcher + smoke test)
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -109,13 +110,49 @@ jobs:
       - name: Launcher end-to-end (local update feed)
         run: scripts/test.ps1 launcher
 
+      - name: Collect the release files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'release'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $zip = "dist/POKKER-$env:VERSION.zip"
+          foreach ($f in $zip, "$zip.sha256") {
+            if (-not (Test-Path $f)) { throw "Falta $f" }
+            Copy-Item $f $out
+          }
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'release-notes.md') $out
+
+      - name: Upload the release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Download the release files
+        uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: release
+
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          $zip = "dist/POKKER-$env:VERSION.zip"
-          foreach ($f in $zip, "$zip.sha256") { if (-not (Test-Path $f)) { throw "Falta $f" } }
-          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
-          gh release create $env:TAG $zip "$zip.sha256" --title "POKKER $env:VERSION" --notes-file $notes
+          $zip = "release/POKKER-$env:VERSION.zip"
+          foreach ($f in $zip, "$zip.sha256", 'release/release-notes.md') { if (-not (Test-Path $f)) { throw "Falta $f" } }
+          gh release create $env:TAG $zip "$zip.sha256" --title "POKKER $env:VERSION" --notes-file release/release-notes.md
           if ($LASTEXITCODE -ne 0) { throw "gh release create fallo (codigo $LASTEXITCODE)" }

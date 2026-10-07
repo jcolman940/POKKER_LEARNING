@@ -1,8 +1,13 @@
 name: CI
 
 on:
+  # Branches only: a v* tag is built and published by release.yml.
   push:
+    branches: ['**']
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   windows:
@@ -12,6 +17,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@v6
 
@@ -57,12 +64,6 @@ jobs:
 
       - name: Integration
         run: scripts/test.ps1 integration
-
-      # package.ps1 needs cl.exe on PATH (it only knows the local VS Build Tools path otherwise).
-      - name: MSVC environment for packaging
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64
 
       - name: Package (PyInstaller server + launcher + smoke test)
         run: scripts/package.ps1 -SkipTests
