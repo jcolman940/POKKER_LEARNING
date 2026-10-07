@@ -4,16 +4,19 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import charts, hands, pushfold, ranges, simulator, stats, system
+from app.api import charts, hands, pushfold, ranges, simulator, solver, stats, system
 from app.config import get_settings
 from app.db import run_migrations
+from app.solver.worker_registry import start_worker, stop_worker
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if get_settings().auto_migrate:
         run_migrations()
+    start_worker()  # no-op unless POKER_SOLVER_PATH points to an existing binary
     yield
+    stop_worker()
 
 
 def create_app() -> FastAPI:
@@ -32,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(pushfold.router, prefix=settings.api_prefix)
     app.include_router(hands.router, prefix=settings.api_prefix)
     app.include_router(stats.router, prefix=settings.api_prefix)
+    app.include_router(solver.router, prefix=settings.api_prefix)
 
     # Domain and core errors (bad cards, empty ranges, impossible deals) are user input
     # problems: report them as 422 with a readable message.
