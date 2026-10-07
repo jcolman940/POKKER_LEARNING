@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -133,6 +133,30 @@ class Hand(Base):
     agg_bets: Mapped[int] = mapped_column(Integer, default=0)
     agg_calls: Mapped[int] = mapped_column(Integer, default=0)
     agg_folds: Mapped[int] = mapped_column(Integer, default=0)
+
+    decisions: Mapped[list["HandDecision"]] = relationship(
+        "HandDecision", cascade="all, delete-orphan"
+    )
+
+
+class HandDecision(Base):
+    """One of hero's preflop decisions in a hand (up to two per hand)."""
+
+    __tablename__ = "hand_decisions"
+    __table_args__ = (Index("ix_hand_decisions_spot", "game_format", "position", "situation"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    hand_id: Mapped[int] = mapped_column(ForeignKey("hands.id", ondelete="CASCADE"), index=True)
+    idx: Mapped[int] = mapped_column(Integer)
+    game_format: Mapped[str] = mapped_column(String(16))
+    table_size: Mapped[int] = mapped_column(Integer)
+    position: Mapped[str] = mapped_column(String(8))
+    situation: Mapped[str] = mapped_column(String(16))
+    vs_position: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    hand_class: Mapped[str] = mapped_column(String(3))
+    stack_bb: Mapped[float] = mapped_column(Float)
+    action: Mapped[str] = mapped_column(String(8))
+    spot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class TournamentResult(Base):

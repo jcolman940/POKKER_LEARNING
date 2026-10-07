@@ -22,6 +22,7 @@ from app.db.models import Hand, ImportBatch, TournamentResult
 from app.domain.hand import HandRecord
 from app.parsers.base import ParseError, RawHand
 from app.parsers.registry import detect_parser
+from app.stats.decisions import decision_rows
 from app.stats.facts import hero_facts
 
 MAX_ZIP_MEMBERS = 20_000
@@ -151,6 +152,7 @@ def hand_row(record: HandRecord, raw_text: str, import_id: int | None) -> Hand:
     if facts is not None:
         for key, value in facts.as_dict().items():
             setattr(row, key, value)
+    row.decisions = decision_rows(record)
     return row
 
 

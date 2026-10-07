@@ -7,13 +7,17 @@ from fastapi.responses import JSONResponse
 from app.api import charts, hands, pushfold, ranges, simulator, solver, stats, system
 from app.config import get_settings
 from app.db import run_migrations
+from app.db.session import _session_factory
 from app.solver.worker_registry import start_worker, stop_worker
+from app.stats.decisions import backfill_decisions
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if get_settings().auto_migrate:
         run_migrations()
+        with _session_factory()() as session:
+            backfill_decisions(session)
     start_worker()  # no-op unless POKER_SOLVER_PATH points to an existing binary
     yield
     stop_worker()
