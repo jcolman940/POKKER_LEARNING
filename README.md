@@ -109,39 +109,46 @@ binario `console_solver.exe` (con su carpeta de recursos al lado). Por ejemplo, 
 POKER_SOLVER_PATH=C:\tools\TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe
 ```
 
-o bien, en PowerShell: `$env:POKER_SOLVER_PATH = 'C:\...\console_solver.exe'`. También se puede ver y
-probar desde *Solver → Configuración*.
+o bien, en PowerShell: `$env:POKER_SOLVER_PATH = 'C:\...\console_solver.exe'`. *Solver → Configuración*
+muestra la ruta detectada, la versión del solver, los hilos y el tamaño de la caché (con botón para
+vaciarla).
 
-**Árboles de apuestas.** Los presets están en `data/solver/trees.json`: `simple` (por defecto), `chico` y
-`amplio`. En el Simulador se elige el preset junto al análisis.
+**Árboles de apuestas.** Los presets están en `data/solver/trees.json`: `chico` (por defecto),
+`simple` (para turn/river) y `amplio` (lento, mucha RAM). En el Simulador se elige el preset junto al
+análisis.
 
 **Cola y prioridades.** Todos los solves pasan por una cola persistente: simulador (0) > lote (10) >
 biblioteca (20). Solo las peticiones del simulador interrumpen un solve en curso; la cola se puede pausar
 y sobrevive a reinicios. Resultados cacheados: repetir un análisis responde al instante.
 
 **Biblioteca** (`data/solver/library.json`). 11 líneas (7 de MTT a 25/40bb + 4 de cash 6-max 100bb) × 25
-flops representativos = **275 solves** (~9 h con `simple`, ~3,5 h con `chico`). Se arma solo a partir de
+flops representativos = **275 solves** (con `chico`, para las líneas de 100bb, del orden de decenas de horas; las de MTT a 25/40bb son más
+rápidas: encolá una línea por vez, de noche). Se arma solo a partir de
 **tus propias tablas preflop** (si falta una, la línea queda como "falta tabla") y una entrada pasa a
 "desactualizado" cuando cambia la tabla de origen. Los 25 flops se eligen para cubrir carta alta y textura
 (sesgo a amplitud, no ponderado por frecuencia). Se encola por línea o completa desde *Solver → Biblioteca*.
 
-**Tiempos medidos en esta PC.** Turn/river: ~8-20 s (casi todo es arranque fijo); un flop realista: ~2 min.
+**Tiempos medidos en esta PC (6 núcleos, 16 GB).** Turn/river: ~8-20 s. Un flop cash SRP de 100bb:
+~10 min con `chico` (190 iteraciones, explotabilidad ~0,6 %). Con `simple` el mismo flop puede superar los
+30 min (el timeout, `POKER_SOLVER_TIMEOUT_MIN`) y ~9 GB de RAM: usalo para turn/river o stacks cortos.
+`amplio` puede no entrar en 16 GB en flops profundos.
 
 **Multiway.** Con más de 2 jugadores no se usa el solver sino una heurística propia (equity vs rangos,
 realización por posición, semi-bluffs por outs), siempre marcada "aproximado". Los umbrales son
-configurables con `POKER_HEURISTIC_*` (ver tabla).
+configurables con `POKER_HEURISTIC_*` (ver tabla). Funciona sin el binario del solver.
 
 **Interfaz.** El Simulador suma el rango de Hero, "Prellenar desde tablas" (arma los rangos de Hero y
 rivales desde tus tablas), el selector de preset y el progreso del solve pendiente. La pestaña *Solver* tiene
-*Cola*, *Biblioteca*, visor de estrategia (grilla 13×13, acciones con tamaños, explotabilidad) y
-*Configuración*.
+*Cola*, *Biblioteca* (incluye "Lote propio"), visor de estrategia (grilla 13×13, acciones con tamaños,
+borrado de un resultado de la caché) y *Configuración*. Si la cola está pausada, el simulador avisa que
+hay que reanudarla en *Solver → Cola*.
 
 **Limitaciones.**
 - Solo la primera decisión de Hero en la calle (no raises posteriores dentro de la calle).
 - Sin rake.
 - Sin EV: TexasSolver v0.2.0 no lo entrega, así que el solver muestra frecuencias y explotabilidad.
-- Los rangos se envían al solver por clase de mano (los pesos por combo se promedian), por lo que el
-  resultado se marca "aproximado".
+- Los rangos se envían al solver por clase de mano; el resultado se marca "aproximado" solo
+  cuando los pesos de una misma clase difieren entre combos (ahí se promedian).
 
 ## Configuración
 
