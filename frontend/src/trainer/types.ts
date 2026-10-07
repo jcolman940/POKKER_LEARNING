@@ -69,6 +69,7 @@ export interface Feedback {
   recommendation: Recommendation | null
   reference_layers: { action: string; grid: number[] }[]
   hand_index: number | null
+  range?: RangeFeedback | null
 }
 
 export interface Summary {
@@ -89,3 +90,12 @@ export interface FrequentError {
   lapses: number
   reps: number
 }
+
+export interface RangeFeedback {
+  target: number[]
+  diff_grid: number[]
+  top_classes: { hand_class: string; target: number; painted: number; weight: number }[]
+  precision: number
+}
+
+export type AnswerBody = { action: string } | { painted: number[] }

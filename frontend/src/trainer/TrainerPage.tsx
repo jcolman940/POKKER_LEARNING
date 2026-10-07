@@ -11,10 +11,13 @@ import {
   nextSpot,
 } from './api'
 import { Feedback } from './Feedback'
+import { PayoutsEditor } from './PayoutsEditor'
+import { RangeDrill } from './RangeDrill'
 import { actionForKey } from './format'
 import { SessionSidebar } from './SessionSidebar'
 import { SpotView } from './SpotView'
 import type {
+  AnswerBody,
   Feedback as FeedbackData,
   FrequentError,
   InitialFilters,
@@ -27,9 +30,10 @@ import type {
   TrainerSource,
 } from './types'
 
-const HAND_SOURCES: [TrainerSource, string][] = [
+const SOURCE_OPTIONS: [TrainerSource, string][] = [
   ['pushfold', 'Push/fold'],
   ['chart', 'Tablas preflop'],
+  ['range', 'Pintá tu rango'],
 ]
 const POSITIONS = ['UTG', 'UTG+1', 'UTG+2', 'UTG+3', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
 const BUCKETS = ['3-5', '6-8', '9-11', '12-15', '16-30', '31-60', '61-120', '120+']
@@ -144,9 +148,9 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
   const available = (id: TrainerSource) => !sourcesError && (sources === null || sources[id].available)
   const reasonFor = (id: TrainerSource) =>
     sourcesError ? 'No se pudo consultar la disponibilidad' : sources?.[id].reason
-  const chosen = filters.sources ?? HAND_SOURCES.map(([id]) => id)
+  const chosen = filters.sources ?? SOURCE_OPTIONS.map(([id]) => id)
   const selectedSources = (): TrainerSource[] =>
-    HAND_SOURCES.map(([id]) => id).filter((id) => chosen.includes(id) && available(id))
+    SOURCE_OPTIONS.map(([id]) => id).filter((id) => chosen.includes(id) && available(id))
 
   const loadNext = useCallback(async (id: number) => {
     const my = ++gen.current
@@ -215,13 +219,13 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
   }
 
   const answer = useCallback(
-    async (action: string) => {
+    async (body: AnswerBody) => {
       if (!spot || feedback || busy.current || sessionId === null) return
       busy.current = true
       const my = gen.current
       const live = () => my === gen.current && mounted.current
       try {
-        const fb = await answerSpot(spot.spot_id, action)
+        const fb = await answerSpot(spot.spot_id, body)
         if (!live()) return
         setFeedback(fb)
         setSummaryError(false)
@@ -256,7 +260,7 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
       const action = actionForKey(e.key, spot.offered)
       if (action) {
         e.preventDefault()
-        void answer(action)
+        void answer({ action })
       }
     }
     window.addEventListener('keydown', onKey)
@@ -294,7 +298,7 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
             <>
               <fieldset className="trainer-group">
                 <legend>Fuentes</legend>
-                {HAND_SOURCES.map(([id, text]) => {
+                {SOURCE_OPTIONS.map(([id, text]) => {
                   const disabled = !available(id)
                   return (
                     <label key={id} className="trainer-check">
@@ -310,6 +314,15 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
                   )
                 })}
               </fieldset>
+              <PayoutsEditor
+                payouts={payouts}
+                onChange={(list) => {
+                  setPayouts(list)
+                  setFilters((f) =>
+                    f.payoutId !== null && !list.some((p) => p.id === f.payoutId) ? { ...f, payoutId: null } : f,
+                  )
+                }}
+              />
               <CheckGroup
                 legend="Formatos"
                 options={FORMATS}
@@ -412,11 +425,17 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
           </p>
         )}
         {spot && spot.kind === 'range' && (
-          <p className="muted">Los ejercicios de rango todavía no están disponibles en esta pantalla.</p>
+          <RangeDrill
+            key={spot.spot_id}
+            spot={spot}
+            feedback={feedback}
+            onSubmit={(painted) => void answer({ painted })}
+            onNext={sessionId !== null ? () => void loadNext(sessionId) : undefined}
+          />
         )}
         {spot && spot.kind === 'hand' && (
           <>
-            <SpotView spot={spot} onAnswer={feedback ? undefined : (a) => void answer(a)} />
+            <SpotView spot={spot} onAnswer={feedback ? undefined : (a) => void answer({ action: a })} />
             {feedback && sessionId !== null && (
               <Feedback feedback={feedback} onNext={() => void loadNext(sessionId)} />
             )}

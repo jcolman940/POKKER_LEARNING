@@ -262,3 +262,161 @@ describe('TrainerPage', () => {
     expect(await screen.findByText(/No se pudieron cargar las estructuras de premios/)).toBeInTheDocument()
   })
 })
+
+const RANGE_SPOT = {
+  spot_id: 'rng',
+  kind: 'range',
+  source: 'range',
+  scenario: null,
+  offered: ['raise'],
+  title: 'Pintá el rango de raise: BTN RFI',
+  card_id: 9,
+  review: false,
+}
+
+function rangeFeedback() {
+  const diff = Array(169).fill(0)
+  diff[0] = -1 // AA missing
+  diff[2] = 1 // extra
+  return {
+    verdict: 'acceptable',
+    loss: 0.18,
+    loss_unit: 'freq',
+    approximate: true,
+    chosen: null,
+    best: 'raise',
+    recommendation: null,
+    reference_layers: [],
+    hand_index: null,
+    range: {
+      target: Array(169).fill(0),
+      diff_grid: diff,
+      top_classes: [
+        { hand_class: 'A5s', target: 1, painted: 0, weight: 4 },
+        { hand_class: 'K9o', target: 0, painted: 1, weight: 12 },
+      ],
+      precision: 0.82,
+    },
+    card: { interval_days: 1, due_at: null, ease: 2.5 },
+  }
+}
+
+function rangeRoutes(extra: Record<string, () => { status?: number; json: unknown }> = {}) {
+  return routes({
+    'POST /api/trainer/sessions/1/next': () => ({ json: RANGE_SPOT }),
+    'POST /api/trainer/spots/rng/answer': () => ({ json: rangeFeedback() }),
+    ...extra,
+  })
+}
+
+async function startRange() {
+  render(<TrainerPage />)
+  await user.click(await screen.findByRole('button', { name: 'Empezar' }))
+  await screen.findByText('Pintá el rango de raise: BTN RFI')
+}
+
+describe('range drill', () => {
+  it('offers the range source', async () => {
+    mockApi(routes())
+    render(<TrainerPage />)
+    expect(await screen.findByRole('checkbox', { name: /Pintá tu rango/ })).toBeEnabled()
+  })
+
+  it('sends 169 values with the two painted cells at 1 and shows the precision', async () => {
+    const fetchMock = mockApi(rangeRoutes())
+    await startRange()
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^AA:/ }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^AKs:/ }))
+    fireEvent.pointerUp(window)
+    await user.click(screen.getByRole('button', { name: 'Enviar' }))
+    expect(await screen.findByText(/82\s*%/)).toBeInTheDocument()
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/spots/rng/answer'))
+    const painted = JSON.parse(String(call?.[1]?.body)).painted as number[]
+    expect(painted).toHaveLength(169)
+    expect(painted.filter((v) => v === 1)).toHaveLength(2)
+    expect(painted.filter((v) => v === 0)).toHaveLength(167)
+    expect(screen.getByText(/Faltan: A5s \(4 combos\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Sobran: K9o \(12 combos\)/)).toBeInTheDocument()
+    expect(screen.getByText('Aceptable', { selector: '.verdict' })).toBeInTheDocument()
+  })
+
+  it('clears the painting and ignores hand shortcuts', async () => {
+    const fetchMock = mockApi(rangeRoutes())
+    await startRange()
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^AA:/ }))
+    fireEvent.pointerUp(window)
+    await user.click(screen.getByRole('button', { name: 'Limpiar' }))
+    await user.keyboard('f')
+    await user.keyboard('1')
+    await act(async () => {})
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/answer'))).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Enviar' }))
+    await screen.findByText(/82\s*%/)
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/spots/rng/answer'))
+    expect((JSON.parse(String(call?.[1]?.body)).painted as number[]).every((v) => v === 0)).toBe(true)
+  })
+
+  it('asks for the next spot with Enter after the feedback', async () => {
+    const fetchMock = mockApi(rangeRoutes())
+    await startRange()
+    await user.click(screen.getByRole('button', { name: 'Enviar' }))
+    await screen.findByText(/82\s*%/)
+    await user.keyboard('{Enter}')
+    await waitFor(() => {
+      const nexts = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/sessions/1/next'))
+      expect(nexts).toHaveLength(2)
+    })
+  })
+})
+
+describe('payout structures', () => {
+  it('lists builtin structures without a delete button and deletes custom ones', async () => {
+    const fetchMock = mockApi(
+      routes({
+        'GET /api/trainer/payouts': () => ({
+          json: [
+            { id: 1, name: 'Top 3', payouts: [50, 30, 20], builtin: true },
+            { id: 2, name: 'Mi sat', payouts: [70, 30], builtin: false },
+          ],
+        }),
+        'DELETE /api/trainer/payouts/2': () => ({ json: null }),
+      }),
+    )
+    render(<TrainerPage />)
+    await screen.findByText('Mi sat', { selector: '.payout-name' })
+    expect(screen.queryByRole('button', { name: 'Borrar Top 3' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Borrar Mi sat' }))
+    await waitFor(() => expect(screen.queryByText('Mi sat', { selector: '.payout-name' })).not.toBeInTheDocument())
+    expect(fetchMock.mock.calls.some(([u, i]) => String(u).endsWith('/payouts/2') && i?.method === 'DELETE')).toBe(true)
+  })
+
+  it('creates a structure with POST /payouts', async () => {
+    const fetchMock = mockApi(
+      routes({
+        'POST /api/trainer/payouts': () => ({
+          status: 201,
+          json: { id: 5, name: 'Heads up', payouts: [65, 35], builtin: false },
+        }),
+      }),
+    )
+    render(<TrainerPage />)
+    await screen.findByText('Top 3', { selector: '.payout-name' })
+    fireEvent.change(screen.getByLabelText('Nombre de la estructura'), { target: { value: 'Heads up' } })
+    fireEvent.change(screen.getByLabelText('Premios (separados por coma)'), { target: { value: '65, 35' } })
+    await user.click(screen.getByRole('button', { name: 'Agregar estructura' }))
+    expect(await screen.findByText('Heads up', { selector: '.payout-name' })).toBeInTheDocument()
+    const call = fetchMock.mock.calls.find(([u, i]) => String(u) === '/api/trainer/payouts' && i?.method === 'POST')
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ name: 'Heads up', payouts: [65, 35] })
+  })
+
+  it('rejects non numeric prizes without calling the API', async () => {
+    const fetchMock = mockApi(routes())
+    render(<TrainerPage />)
+    await screen.findByText('Top 3', { selector: '.payout-name' })
+    fireEvent.change(screen.getByLabelText('Nombre de la estructura'), { target: { value: 'X' } })
+    fireEvent.change(screen.getByLabelText('Premios (separados por coma)'), { target: { value: '50, abc' } })
+    await user.click(screen.getByRole('button', { name: 'Agregar estructura' }))
+    expect(await screen.findByText(/números/)).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([u, i]) => String(u) === '/api/trainer/payouts' && i?.method === 'POST')).toBe(false)
+  })
+})
