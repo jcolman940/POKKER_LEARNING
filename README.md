@@ -81,7 +81,7 @@ del rango rival (contra todos los rivales en multiway).
 Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuente lo da), fuente
 (`chart` / `nash` / `solver` / `heuristic`), confianza (exacta / aproximada), explicación corta y avisos.
 
-## Historiales, estadísticas y replayer (fase 4, en curso)
+## Historiales, estadísticas y replayer (fase 4)
 
 - **Importación** (`POST /api/imports`, pestaña *Historiales*): `.txt` y `.zip`, sala detectada por contenido
   (un parser por sala en `backend/app/parsers/`), idempotente por (sala, id de mano), tolerante a errores
@@ -96,6 +96,53 @@ Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuen
 - **Replayer** (`/api/hands/{id}/replay`): paso a paso con la equity de Hero contra los rangos asignados y
   el botón *Analizar este spot*, que abre el simulador con el escenario armado.
 
+## Solver postflop (fase 5)
+
+Integra [TexasSolver v0.2.0](https://github.com/bupticybee/TexasSolver/releases/tag/v0.2.0) como binario
+externo (AGPL: solo se ejecuta por subprocess, su código no se incluye).
+
+**Instalación.** Bajá el zip de Windows de la release (SHA-256
+`0A9122FA0CD9384E6C1CBE0492E8A3B8AC7809890C649E1A53F77A59D6D50A7C`), descomprimilo y apuntá al
+binario `console_solver.exe` (con su carpeta de recursos al lado). Por ejemplo, en `backend/.env`:
+
+```
+POKER_SOLVER_PATH=C:\tools\TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe
+```
+
+o bien, en PowerShell: `$env:POKER_SOLVER_PATH = 'C:\...\console_solver.exe'`. También se puede ver y
+probar desde *Solver → Configuración*.
+
+**Árboles de apuestas.** Los presets están en `data/solver/trees.json`: `simple` (por defecto), `chico` y
+`amplio`. En el Simulador se elige el preset junto al análisis.
+
+**Cola y prioridades.** Todos los solves pasan por una cola persistente: simulador (0) > lote (10) >
+biblioteca (20). Solo las peticiones del simulador interrumpen un solve en curso; la cola se puede pausar
+y sobrevive a reinicios. Resultados cacheados: repetir un análisis responde al instante.
+
+**Biblioteca** (`data/solver/library.json`). 11 líneas (7 de MTT a 25/40bb + 4 de cash 6-max 100bb) × 25
+flops representativos = **275 solves** (~9 h con `simple`, ~3,5 h con `chico`). Se arma solo a partir de
+**tus propias tablas preflop** (si falta una, la línea queda como "falta tabla") y una entrada pasa a
+"desactualizado" cuando cambia la tabla de origen. Los 25 flops se eligen para cubrir carta alta y textura
+(sesgo a amplitud, no ponderado por frecuencia). Se encola por línea o completa desde *Solver → Biblioteca*.
+
+**Tiempos medidos en esta PC.** Turn/river: ~8-20 s (casi todo es arranque fijo); un flop realista: ~2 min.
+
+**Multiway.** Con más de 2 jugadores no se usa el solver sino una heurística propia (equity vs rangos,
+realización por posición, semi-bluffs por outs), siempre marcada "aproximado". Los umbrales son
+configurables con `POKER_HEURISTIC_*` (ver tabla).
+
+**Interfaz.** El Simulador suma el rango de Hero, "Prellenar desde tablas" (arma los rangos de Hero y
+rivales desde tus tablas), el selector de preset y el progreso del solve pendiente. La pestaña *Solver* tiene
+*Cola*, *Biblioteca*, visor de estrategia (grilla 13×13, acciones con tamaños, explotabilidad) y
+*Configuración*.
+
+**Limitaciones.**
+- Solo la primera decisión de Hero en la calle (no raises posteriores dentro de la calle).
+- Sin rake.
+- Sin EV: TexasSolver v0.2.0 no lo entrega, así que el solver muestra frecuencias y explotabilidad.
+- Los rangos se envían al solver por clase de mano (los pesos por combo se promedian), por lo que el
+  resultado se marca "aproximado".
+
 ## Configuración
 
 Centralizada en `backend/app/config.py`. Toda opción se puede sobreescribir con
@@ -109,7 +156,15 @@ variables `POKER_*` o un archivo `.env` en `backend/`:
 | `POKER_PUSHFOLD_MAX_BB` | `15` | Stack efectivo máximo para usar push/fold en torneos |
 | `POKER_HERO_NAMES` | `[]` | Nombres a usar como Hero si el archivo no lo indica (JSON) |
 | `POKER_STATS_MIN_SAMPLE` | `100` | Muestra mínima antes de marcar una métrica como insuficiente |
-| `POKER_SOLVER_PATH` | — | Binario de TexasSolver (fase 5) |
+| `POKER_SOLVER_PATH` | — | Ruta a `console_solver.exe` de TexasSolver v0.2.0 (ej. en `backend/.env`) |
+| `POKER_SOLVER_THREADS` | núcleos de CPU | Hilos que usa el solver |
+| `POKER_SOLVER_TIMEOUT_MIN` | `30` | Tiempo máximo por solve (minutos) |
+| `POKER_HEURISTIC_VALUE_SHARE` | `0.65` | Heurística multiway: fracción mínima de cada rango rival a la que Hero le gana para apostar por valor |
+| `POKER_HEURISTIC_RAISE_SHARE` | `0.80` | Heurística multiway: fracción mínima de cada rango rival a la que Hero le gana para subir |
+| `POKER_HEURISTIC_SEMIBLUFF_OUTS` | `8` | Heurística multiway: outs mínimos para semi-bluff |
+| `POKER_HEURISTIC_REALIZATION_OOP` | `0.85` | Heurística multiway: realización de equity fuera de posición |
+| `POKER_HEURISTIC_REALIZATION_LAST` | `0.95` | Heurística multiway: factor de realización de equity en posición / última en hablar |
+| `POKER_HEURISTIC_MARGIN` | `0.03` | Heurística multiway: margen alrededor de los umbrales para mezclar acciones |
 | `POKER_UPDATE_FEED_URL` | — | Canal de actualizaciones (fase 7) |
 
 La versión de la app se lee de `VERSION` y se expone en `GET /api/version`.
