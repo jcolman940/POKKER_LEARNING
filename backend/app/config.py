@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     hero_names: list[str] = []
     # Stats: below this sample size a metric is flagged as insufficient.
     stats_min_sample: int = 100
+    leaks_min_sample: int = 50
 
     # Recommendation: tournaments at or below this effective stack use push/fold Nash.
     pushfold_max_bb: float = 15.0
