@@ -75,6 +75,23 @@ Una fila por decisión: `hand_id` (FK a `hands`), `idx` (1 o 2), `game_format`, 
 
 Feedback: acción de referencia vs. la elegida, barras de frecuencia de esa mano, EV o error, explicación de `recommend()` y grilla 13×13 con la mano marcada. **La recomendación nunca se envía al cliente antes de responder.**
 
+### 4.5 Dificultad configurable
+
+El porcentaje de manos de frontera (§4.3) es un control de la sesión: 0–100%, por defecto 50%. Se guarda con la sesión.
+
+### 4.6 Estructuras de premios propias (ICM)
+
+Además de las estructuras fijas (§4.1), el usuario puede guardar **sus propias estructuras de premios** (nombre + lista de premios restantes) y elegir una para el modo ICM. Tabla `payout_structures`; CRUD mínimo desde el entrenador. Cuando existan los parsers y los resúmenes de torneo (fase 4 pendiente), se podrán precargar desde ahí; en esta fase se cargan a mano.
+
+### 4.7 Modo "Pintá tu rango"
+
+Ejercicio de rango completo en vez de mano por mano:
+- Se elige una tabla (al azar dentro de los filtros, o una puntual) y una acción a dibujar (por ejemplo "raise" en RFI de CO a 100bb).
+- El usuario pinta el rango en la matriz 13×13 (el mismo editor de "Rangos preflop", con frecuencias 0/50/100%).
+- Puntaje: **error ponderado por combos** = `Σ_clases combos × |pintado − tabla| / Σ combos` y su complemento como "precisión". Siempre "aproximado"/sin EV.
+- Feedback: grilla de diferencias (manos que sobran, que faltan, frecuencias erradas), las 10 clases con más peso en el error y precisión en %.
+- Se registra en `trainer_attempts` (fuente `range`), con su propia tarjeta por tabla+acción en la repetición espaciada (veredicto: correcto ≥ 90% de precisión, aceptable ≥ 75%, error < 75%).
+
 ## 5. Repetición espaciada y sesiones
 
 ### 5.1 Tarjeta
@@ -152,7 +169,13 @@ Sin manos: "Importá historiales para ver tus leaks (los parsers de GG/PS llegan
 
 Configuración nueva: `POKER_LEAKS_MIN_SAMPLE` (50).
 
-## 9. Futuro (fuera de alcance): capa conversacional
+## 9. Futuro (fuera de alcance)
+
+### 9.1 Racha y objetivo diario
+
+Objetivo de spots por día y racha de días cumplidos. Pospuesto a una actualización posterior (decisión del usuario).
+
+### 9.2 Capa conversacional
 
 Un modelo de lenguaje como **explicador**, nunca como fuente de las decisiones (no calcula equity ni EV y puede equivocarse con convicción):
 - explicaciones conversacionales de un spot, armadas con los datos estructurados reales (frecuencias, EV, rangos, blockers);
