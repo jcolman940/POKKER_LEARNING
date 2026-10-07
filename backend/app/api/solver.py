@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from datetime import datetime
 from typing import Annotated
 
@@ -17,6 +18,7 @@ from app.recommend.schemas import StrategyLayerOut
 from app.solver import queue as q
 from app.solver.cache import cache_stats, clear_cache, delete_result, get_result
 from app.solver.flops import representative_flops
+from app.solver.install import Installer, detected_solver_path
 from app.solver.library import (
     Family,
     LineSpec,
@@ -86,16 +88,27 @@ def _job(session: Session, job_id: int) -> SolverJob:
 def status(session: DbSession) -> dict:
     s = get_settings()
     entries, size = cache_stats(session)
+    detected = detected_solver_path(s)
     return {
         "configured": solver_available(),
         "version": SOLVER_VERSION,
-        "path": str(s.solver_path) if s.solver_path else None,
+        "path": str(detected) if detected else None,
         "threads": s.solver_threads,
         "paused": q.is_paused(session),
         "cache_entries": entries,
         "cache_bytes": size,
         "presets": [{"name": p.name, "label": p.label} for p in load_presets().values()],
     }
+
+
+@router.post("/install", status_code=202)
+def install_start() -> dict:
+    return asdict(Installer.get().start())
+
+
+@router.get("/install")
+def install_status() -> dict:
+    return asdict(Installer.get().status())
 
 
 @router.get("/jobs", response_model=list[JobOut])

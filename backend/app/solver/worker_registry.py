@@ -4,24 +4,25 @@ from __future__ import annotations
 
 from app.config import get_settings
 from app.db.session import _session_factory
+from app.solver.install import detected_solver_path
 from app.solver.queue import SolverWorker
 
 _worker: SolverWorker | None = None
 
 
 def solver_available() -> bool:
-    path = get_settings().solver_path
-    return path is not None and path.is_file()
+    return detected_solver_path(get_settings()) is not None
 
 
 def start_worker() -> None:
     global _worker
-    if _worker is not None or not solver_available():
+    path = detected_solver_path(get_settings())
+    if _worker is not None or path is None:
         return
     s = get_settings()
     _worker = SolverWorker(
         _session_factory(),
-        s.solver_path,
+        path,
         s.data_dir,
         threads=s.solver_threads,
         timeout_s=s.solver_timeout_min * 60,
