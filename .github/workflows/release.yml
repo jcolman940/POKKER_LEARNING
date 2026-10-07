@@ -1,0 +1,121 @@
+name: Release
+
+# Pushing a tag vX.Y.Z (equal to VERSION, with a "## [X.Y.Z]" section in CHANGELOG.md) runs every
+# test, builds the portable package and publishes it as a GitHub release (spec 5.3).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches VERSION
+        id: version
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($env:TAG -ne "v$version") { throw "El tag $env:TAG no coincide con VERSION ($version): se espera v$version" }
+          "version=$version" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      - name: Release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if (-not (Test-Path CHANGELOG.md)) { throw 'No existe CHANGELOG.md' }
+          $lines = @(Get-Content CHANGELOG.md -Encoding utf8)
+          $header = '^##\s+\[' + [regex]::Escape($env:VERSION) + '\]'
+          $start = -1
+          for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match $header) { $start = $i; break } }
+          if ($start -lt 0) { throw "CHANGELOG.md no tiene la seccion ## [$env:VERSION]" }
+          $end = $lines.Count
+          for ($j = $start + 1; $j -lt $lines.Count; $j++) {
+            # Next version section, or the link references at the end of a Keep a Changelog file.
+            if ($lines[$j] -match '^##\s' -or $lines[$j] -match '^\[[^\]]+\]:\s') { $end = $j; break }
+          }
+          $body = ''
+          if ($end -gt $start + 1) { $body = ($lines[($start + 1)..($end - 1)] -join "`n").Trim() }
+          if (-not $body) { throw "La seccion ## [$env:VERSION] de CHANGELOG.md esta vacia" }
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          [IO.File]::WriteAllText($notes, $body + "`n", (New-Object System.Text.UTF8Encoding $false))
+          Write-Host "Notas de la release ($notes):"
+          Write-Host $body
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Core (C++, MSVC)
+        run: scripts/test.ps1 core
+
+      - name: Benchmark
+        run: scripts/bench.ps1 5000000
+
+      - name: Cache TexasSolver
+        id: texassolver
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/TexasSolver
+          key: texassolver-v0.2.0-windows
+
+      - name: Download TexasSolver (AGPL, external binary; not part of the repo)
+        if: steps.texassolver.outputs.cache-hit != 'true'
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'ts.zip'
+          Invoke-WebRequest https://github.com/bupticybee/TexasSolver/releases/download/v0.2.0/TexasSolver-v0.2.0-Windows.zip -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($hash -ne '0A9122FA0CD9384E6C1CBE0492E8A3B8AC7809890C649E1A53F77A59D6D50A7C') { throw "Hash inesperado: $hash" }
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'TexasSolver')
+
+      - name: Point the backend at TexasSolver
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe'
+          if (-not (Test-Path $exe)) { throw "TexasSolver no encontrado en $exe" }
+          "POKER_SOLVER_PATH=$exe" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Backend
+        run: scripts/test.ps1 backend
+
+      - name: Frontend
+        run: scripts/test.ps1 frontend
+
+      - name: Integration
+        run: scripts/test.ps1 integration
+
+      # package.ps1 needs cl.exe on PATH (it only knows the local VS Build Tools path otherwise).
+      - name: MSVC environment for packaging
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Package (PyInstaller server + launcher + smoke test)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: scripts/package.ps1 -Version $env:VERSION -SkipTests
+
+      - name: Launcher end-to-end (local update feed)
+        run: scripts/test.ps1 launcher
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $zip = "dist/POKKER-$env:VERSION.zip"
+          foreach ($f in $zip, "$zip.sha256") { if (-not (Test-Path $f)) { throw "Falta $f" } }
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          gh release create $env:TAG $zip "$zip.sha256" --title "POKKER $env:VERSION" --notes-file $notes
+          if ($LASTEXITCODE -ne 0) { throw "gh release create fallo (codigo $LASTEXITCODE)" }

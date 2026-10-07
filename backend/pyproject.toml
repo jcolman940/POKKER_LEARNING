@@ -35,7 +35,10 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["solver: runs the real TexasSolver binary (needs POKER_SOLVER_PATH)"]
+markers = [
+    "solver: runs the real TexasSolver binary (needs POKER_SOLVER_PATH)",
+    "launcher: end-to-end tests of the packaged POKKER.exe (tests/launcher, needs dist/POKKER)",
+]
 
 [tool.ruff]
 line-length = 100

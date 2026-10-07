@@ -1,5 +1,7 @@
 # Runs every test suite in the monorepo on Windows.
-# Usage: scripts\test.ps1 [core] [backend] [frontend] [integration]
+# Usage: scripts\test.ps1 [core] [backend] [frontend] [integration] [launcher]
+#   launcher (not in the default set) runs tests\launcher against dist\POKKER, which
+#   scripts\package.ps1 builds; without it those tests are skipped.
 param([string[]]$Targets = @('core', 'backend', 'frontend', 'integration'))
 
 $ErrorActionPreference = 'Stop'
@@ -50,12 +52,25 @@ function Test-Integration {
     } finally { Pop-Location }
 }
 
+function Test-Launcher {
+    Write-Host '==> launcher (packaged POKKER.exe, local update feed)'
+    if (-not (Test-Path (Join-Path $Root 'dist/POKKER/POKKER.exe'))) {
+        Write-Warning 'No existe dist\POKKER\POKKER.exe: corre scripts\package.ps1 antes (las pruebas se saltean).'
+    }
+    Push-Location (Join-Path $Root 'backend')
+    try {
+        Invoke-Checked { uv sync --quiet }
+        Invoke-Checked { uv run pytest -q -rs (Join-Path $Root 'tests/launcher') }
+    } finally { Pop-Location }
+}
+
 foreach ($t in $Targets) {
     switch ($t) {
         'core' { Test-Core }
         'backend' { Test-Backend }
         'frontend' { Test-Frontend }
         'integration' { Test-Integration }
+        'launcher' { Test-Launcher }
         default { throw "Unknown target: $t" }
     }
 }

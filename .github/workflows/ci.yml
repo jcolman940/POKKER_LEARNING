@@ -57,3 +57,24 @@ jobs:
 
       - name: Integration
         run: scripts/test.ps1 integration
+
+      # package.ps1 needs cl.exe on PATH (it only knows the local VS Build Tools path otherwise).
+      - name: MSVC environment for packaging
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Package (PyInstaller server + launcher + smoke test)
+        run: scripts/package.ps1 -SkipTests
+
+      - name: Launcher end-to-end (local update feed)
+        run: scripts/test.ps1 launcher
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: POKKER-package
+          path: |
+            dist/POKKER-*.zip
+            dist/POKKER-*.zip.sha256
+          if-no-files-found: error
