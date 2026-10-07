@@ -1,7 +1,10 @@
 import { CardView } from './CardView'
 import { num, pct } from './format'
+import { PendingSolve } from './PendingSolve'
 import { RecommendationPanel } from './RecommendationPanel'
 import type { Analysis, EquityResult } from './types'
+
+const noop = () => {}
 
 const STREET_LABEL = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' }
 
@@ -50,9 +53,11 @@ function method(result: EquityResult): string {
 export function ResultsPanel({
   analysis,
   villainLabels,
+  onSolveDone,
 }: {
   analysis: Analysis
   villainLabels: string[]
+  onSolveDone?: () => void
 }) {
   const { equity, equity_vs_hands, outs, metrics, recommendation } = analysis
   const required = metrics.required_equity
@@ -140,7 +145,15 @@ export function ResultsPanel({
         )}
       </section>
 
-      <RecommendationPanel rec={recommendation} />
+      {recommendation.pending_job ? (
+        <PendingSolve
+          key={recommendation.pending_job.id}
+          job={recommendation.pending_job}
+          onDone={onSolveDone ?? noop}
+        />
+      ) : (
+        <RecommendationPanel rec={recommendation} />
+      )}
     </div>
   )
 }

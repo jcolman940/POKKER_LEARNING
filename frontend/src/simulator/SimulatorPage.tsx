@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getJson, postJson } from '../api/client'
 import { CardPicker } from './CardPicker'
 import { CardView } from './CardView'
+import { fetchSolverStatus, prefillRanges } from '../solver/api'
+import { PostflopSolverFields } from './PostflopSolverFields'
 import { RangeEditor } from './RangeEditor'
 import { ResultsPanel } from './ResultsPanel'
 import { SITUATIONS } from '../ranges/labels'
@@ -75,6 +77,19 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [heroRange, setHeroRange] = useState(initial?.hero_range ?? '')
+  const [rangesApprox, setRangesApprox] = useState(initial?.ranges_approximate ?? false)
+  const [prefillNotes, setPrefillNotes] = useState<string[]>([])
+  const [preset, setPreset] = useState(initial?.solver_preset ?? 'simple')
+  const [presets, setPresets] = useState<{ name: string; label: string }[]>([])
+  const [potType, setPotType] = useState<'srp' | '3bet'>('srp')
+  const [aggressor, setAggressor] = useState<'hero' | 'villain'>('villain')
+
+  useEffect(() => {
+    fetchSolverStatus()
+      .then((s) => setPresets(s.presets))
+      .catch(() => setPresets([{ name: 'simple', label: 'Simple' }]))
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -200,6 +215,9 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
           )
         : {},
       payouts: isTournament ? payoutList : [],
+      hero_range: heroRange || null,
+      ranges_approximate: rangesApprox,
+      solver_preset: preset,
     }
     setBusy(true)
     try {
@@ -211,6 +229,51 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
       setBusy(false)
     }
   }
+
+  async function prefill() {
+    const villainPos = villains[0]?.position
+    if (!heroPosition || !villainPos) {
+      setError('Indicá las posiciones de Hero y del Rival 1 para prellenar.')
+      return
+    }
+    setError(null)
+    const [aggr, caller] =
+      aggressor === 'hero' ? [heroPosition, villainPos] : [villainPos, heroPosition]
+    try {
+      const r = await prefillRanges({
+        game_format: format,
+        players: numPlayers,
+        aggressor: aggr,
+        caller,
+        pot_type: potType,
+        stack_bb: parseAmount(stack),
+        ante_bb: parseAmount(ante),
+      })
+      const heroPart = aggressor === 'hero' ? r.aggressor : r.caller
+      const villPart = aggressor === 'hero' ? r.caller : r.aggressor
+      if (heroPart.text) setHeroRange(heroPart.text)
+      if (villPart.text) updateVillain(0, { range: villPart.text })
+      const missing = [heroPart.missing, villPart.missing].filter(Boolean) as string[]
+      setPrefillNotes([
+        ...heroPart.notes,
+        ...villPart.notes,
+        ...missing.map((m) => `Falta tabla: ${m}`),
+      ])
+      setRangesApprox(heroPart.approximate || villPart.approximate || missing.length > 0)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const showSolverFields =
+    boardSlots.filter((c) => c !== null).length >= 3 && villains.length === 1
+
+  // Keep the latest analyze() reachable from the polling callback without re-arming its timer.
+  const analyzeRef = useRef(analyze)
+  useEffect(() => {
+    analyzeRef.current = analyze
+  })
+  const refreshAnalysis = useCallback(() => void analyzeRef.current(), [])
 
   function positionSelect(id: string, value: string | null, onChange: (v: string | null) => void) {
     return (
@@ -399,6 +462,26 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
           </button>
         )}
 
+        {showSolverFields && (
+          <PostflopSolverFields
+            heroRange={heroRange}
+            onHeroRange={(v) => {
+              setHeroRange(v)
+              setRangesApprox(false)
+              setPrefillNotes([])
+            }}
+            preset={preset}
+            onPreset={setPreset}
+            presets={presets}
+            prefill={prefill}
+            prefillNotes={prefillNotes}
+            potType={potType}
+            onPotType={setPotType}
+            aggressor={aggressor}
+            onAggressor={setAggressor}
+          />
+        )}
+
         <section className="panel actions" aria-label="Acciones">
           <label>
             Calle
@@ -428,7 +511,11 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
 
       <div className="sim-results" aria-live="polite">
         {analysis ? (
-          <ResultsPanel analysis={analysis} villainLabels={villainLabels} />
+          <ResultsPanel
+            analysis={analysis}
+            villainLabels={villainLabels}
+            onSolveDone={refreshAnalysis}
+          />
         ) : (
           <section className="panel panel-muted">
             <p className="muted">

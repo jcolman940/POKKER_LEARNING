@@ -31,13 +31,15 @@ const ANALYSIS: Analysis = {
     confidence: 'approximate',
     hand_class: 'AA',
     actions: [
-      { action: 'raise', frequency: 0.75, ev: null },
-      { action: 'fold', frequency: 0.25, ev: null },
+      { action: 'raise', frequency: 0.75, ev: null, label: null, amount_bb: null },
+      { action: 'fold', frequency: 0.25, ev: null, label: null, amount_bb: null },
     ],
     ev_unit: null,
     reference: 'Fuente externa: Pokalab · BTN RFI',
     explanation: ['Valor: la mano está en la mitad fuerte de tu rango de raise.'],
     warnings: ['Stack del rango: 100bb (escenario: 40bb)'],
+    pending_job: null,
+    strategy_grid: [],
   },
 }
 

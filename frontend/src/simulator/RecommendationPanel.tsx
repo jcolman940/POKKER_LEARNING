@@ -1,4 +1,5 @@
 import { ACTION_LABEL } from '../ranges/labels'
+import { RangeMatrix } from '../ranges/RangeMatrix'
 import { pct } from './format'
 import type { Recommendation } from './types'
 
@@ -31,8 +32,8 @@ export function RecommendationPanel({ rec }: { rec: Recommendation }) {
       </div>
       <ul className="rec-actions">
         {rec.actions.map((a) => (
-          <li key={a.action}>
-            <span className="rec-action-name">{ACTION_LABEL[a.action] ?? a.action}</span>
+          <li key={a.label ?? a.action}>
+            <span className="rec-action-name">{a.label ?? ACTION_LABEL[a.action] ?? a.action}</span>
             <span className="rec-bar" aria-hidden="true">
               <span
                 className="rec-bar-fill"
@@ -49,6 +50,12 @@ export function RecommendationPanel({ rec }: { rec: Recommendation }) {
           </li>
         ))}
       </ul>
+      {rec.strategy_grid.length > 0 && (
+        <RangeMatrix
+          layers={rec.strategy_grid.map((l) => ({ action: l.action, grid: l.grid }))}
+          caption="Estrategia del rango de Hero en este nodo"
+        />
+      )}
       {rec.reference && <p className="small muted">{rec.reference}</p>}
       {rec.explanation.length > 0 && (
         <ul className="small rec-explanation">

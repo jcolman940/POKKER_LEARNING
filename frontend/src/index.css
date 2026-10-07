@@ -23,6 +23,8 @@
   --action-call: #3f8f4f;
   --action-limp: #8ca53b;
   --action-fold: #8a9490;
+  --action-check: var(--action-call);
+  --action-bet: var(--action-raise);
   --series-total: #008300;
   --series-showdown: #2a78d6;
   --series-nonshowdown: #e34948;
@@ -62,6 +64,8 @@
     --action-call: #4fb062;
     --action-limp: #a7c34f;
     --action-fold: #6b7571;
+    --action-check: var(--action-call);
+    --action-bet: var(--action-raise);
     --series-total: #008300;
     --series-showdown: #3987e5;
     --series-nonshowdown: #e66767;

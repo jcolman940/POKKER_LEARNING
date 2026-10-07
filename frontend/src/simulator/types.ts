@@ -1,3 +1,5 @@
+import type { PendingJob, StrategyLayer } from '../solver/types'
+
 export type GameFormat = 'cash' | 'mtt' | 'sng' | 'spin'
 export type Street = 'preflop' | 'flop' | 'turn' | 'river'
 
@@ -23,12 +25,17 @@ export interface ScenarioInput {
   bb_ante_bb: number
   stacks_bb: Record<string, number>
   payouts: number[]
+  hero_range: string | null
+  ranges_approximate: boolean
+  solver_preset: string
 }
 
 export interface RecommendedAction {
   action: string
   frequency: number
   ev: number | null
+  label: string | null
+  amount_bb: number | null
 }
 
 export interface Recommendation {
@@ -42,6 +49,8 @@ export interface Recommendation {
   reference: string | null
   explanation: string[]
   warnings: string[]
+  pending_job: PendingJob | null
+  strategy_grid: StrategyLayer[]
 }
 
 export interface PlayerEquity {

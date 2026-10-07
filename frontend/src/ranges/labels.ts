@@ -10,6 +10,8 @@ export const ACTION_LABEL: Record<string, string> = {
   '5bet': '5-bet',
   allin: 'All-in',
   fold: 'Fold',
+  check: 'Check',
+  bet: 'Bet',
 }
 
 export const SITUATIONS = [
