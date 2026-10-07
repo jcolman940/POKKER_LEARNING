@@ -32,7 +32,15 @@ class Reference:
         """Hero's real action in the reference's vocabulary (Nash has fold / one action)."""
         if not self.nash or action in ("fold", "limp"):
             return action
-        return self.act_name
+        return self.act_name  # includes "allin" vs a shove, which counts as a call
+
+    def is_mapped(self, action: str) -> bool:
+        """True when a Nash score had to assimilate Hero's action to push/fold."""
+        if not self.nash:
+            return False
+        if action == "fold" or action == self.act_name:
+            return False
+        return not (action == "allin" and self.act_name == "call")
 
     def loss(self, hand_class: str, done: str) -> float:
         """EV given up against the best Nash action (0 for charts). Limps count as folds."""
@@ -55,7 +63,8 @@ class ReferenceBuilder:
     def __init__(self, session: Session):
         self.session = session
         self._matches: dict[tuple, ChartMatch | None] = {}
-        self._chart_refs: dict[int, Reference] = {}
+        self._tables: dict[int, dict[str, dict[str, float]]] = {}
+        self._chart_refs: dict[tuple, Reference] = {}
         self._nash_refs: dict[tuple, Reference | None] = {}
 
     def resolve(self, d: HandDecision) -> tuple[Reference, str] | None:
@@ -82,17 +91,27 @@ class ReferenceBuilder:
         match = self._matches[qkey]
         if match is None:
             return None
-        chart = match.chart
-        ref = self._chart_refs.get(chart.id)
+        ref = self._chart_refs.get(qkey)
         if ref is None:
-            by_class: dict[str, dict[str, float]] = {}
+            ref = Reference(
+                by_class=self._table(match.chart),
+                exact=match.exact,
+                notes=list(match.mismatches),
+            )
+            self._chart_refs[qkey] = ref
+        return ref
+
+    def _table(self, chart) -> dict[str, dict[str, float]]:
+        """Per-class frequencies of a chart (shared by every query that matches it)."""
+        table = self._tables.get(chart.id)
+        if table is None:
+            table = {}
             for i, name in enumerate(class_index()):
                 freqs = {a: float(g[i]) for a, g in chart.actions.items() if g[i] > 0}
                 freqs["fold"] = max(0.0, 1.0 - sum(freqs.values()))
-                by_class[name] = freqs
-            ref = Reference(by_class=by_class, exact=match.exact, notes=list(match.mismatches))
-            self._chart_refs[chart.id] = ref
-        return ref
+                table[name] = freqs
+            self._tables[chart.id] = table
+        return table
 
     def _nash(self, d: HandDecision) -> Reference | None:
         key = _spot_key(d)

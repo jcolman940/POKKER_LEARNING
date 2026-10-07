@@ -29,6 +29,7 @@ SITUATION_LABEL = {
     Situation.BVB: "blind vs blind",
     Situation.VS_ALLIN: "vs all-in",
 }
+MAPPED_NOTE = "Algunas acciones se asimilaron a push/fold: EV aproximado"
 NO_DECISIONS = (
     "Importá historiales para ver tus leaks (los parsers de GG/PS llegan con tus archivos)."
 )
@@ -81,6 +82,7 @@ class TopClass(BaseModel):
 
 class LeakDetail(BaseModel):
     group: LeakGroup
+    action: str
     top_classes: list[TopClass]
     grid: list[float | None]
 
@@ -100,6 +102,7 @@ class _Item:
     done: str
     ref: Reference
     loss: float
+    mapped: bool = False
 
     def expected(self, action: str) -> float:
         return self.ref.expected(self.hand_class).get(action, 0.0)
@@ -161,6 +164,9 @@ def _build_group(key: str, acc: _Acc, total_hands: int, min_sample: int) -> Leak
         impact = max((abs(a.diff) for a in actions), default=0.0) * n * scale
         unit, approximate = "pts/100", True
     approximate = approximate or any(not i.ref.exact for i in acc.items)
+    if any(i.mapped for i in acc.items):
+        approximate = True
+        notes.append(MAPPED_NOTE)
     return LeakGroup(
         key=key,
         label=_label(d, acc.bucket),
@@ -188,17 +194,22 @@ def _analyze(session: Session, filters: StatsFilter):
     decisions = session.scalars(stmt.order_by(HandDecision.id)).all()
     refs = ReferenceBuilder(session)
     accs: dict[str, _Acc] = {}
-    skipped = 0
+    skipped = unresolved = 0
     for d in decisions:
         resolved = refs.resolve(d)
         if resolved is None:
-            skipped += 1
+            if d.spot is None:
+                skipped += 1
+            else:
+                unresolved += 1
             continue
         ref, source = resolved
         bucket = stack_bucket(d.stack_bb, source == "nash")
         acc = accs.setdefault(_key(d, bucket, source), _Acc(d=d, bucket=bucket, source=source))
         done = ref.map_action(d.action)
-        acc.items.append(_Item(d.hand_class, done, ref, ref.loss(d.hand_class, done)))
+        acc.items.append(
+            _Item(d.hand_class, done, ref, ref.loss(d.hand_class, done), ref.is_mapped(d.action))
+        )
     warnings = []
     if not decisions:
         warnings.append(NO_DECISIONS)
@@ -206,6 +217,8 @@ def _analyze(session: Session, filters: StatsFilter):
         warnings.append(
             f"Hay {skipped} decisiones sin tabla de referencia: cargalas en Rangos preflop."
         )
+    if unresolved:
+        warnings.append(f"{unresolved} decisiones de push/fold no se pudieron evaluar.")
     return accs, total_hands, get_settings().leaks_min_sample, warnings
 
 
@@ -231,7 +244,8 @@ def leak_detail(session: Session, filters: StatsFilter, key: str) -> LeakDetail 
     if acc is None:
         return None
     group = _build_group(key, acc, total_hands, min_sample)
-    worst = max(group.actions, key=lambda a: abs(a.diff)).action
+    # On |diff| ties (raise/fold are mirror images) prefer the non-fold action.
+    worst = max(group.actions, key=lambda a: (round(abs(a.diff), 9), a.action != "fold")).action
     per_class: dict[str, list[_Item]] = defaultdict(list)
     for item in acc.items:
         per_class[item.hand_class].append(item)
@@ -250,4 +264,4 @@ def leak_detail(session: Session, filters: StatsFilter, key: str) -> LeakDetail 
     index = class_index()
     for r in rows:
         grid[index[r.hand_class]] = r.diff
-    return LeakDetail(group=group, top_classes=rows[:10], grid=grid)
+    return LeakDetail(group=group, action=worst, top_classes=rows[:10], grid=grid)

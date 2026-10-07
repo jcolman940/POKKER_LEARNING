@@ -3,7 +3,7 @@ import random
 import pytest
 
 from app.config import get_settings
-from app.db.models import PreflopChart
+from app.db.models import HandDecision, PreflopChart
 from app.domain.scenario import GameFormat
 from app.leaks.finder import find_leaks, leak_detail, stack_bucket
 from app.parsers.importer import hand_row
@@ -151,3 +151,81 @@ def test_detail_has_top_classes_and_grid(db_session):
 
 def test_settings_default():
     assert get_settings().leaks_min_sample == 50
+
+
+def all_groups(report):
+    return report.leaks + report.insufficient + report.other
+
+
+def test_chart_notes_are_per_query(db_session):
+    add_chart(db_session)
+    rng = random.Random(3)
+    deep = [rng.choice(NAMES) for _ in range(30)]
+    short = [rng.choice(NAMES) for _ in range(30)]
+    add_hands(db_session, short, [False] * 30, stacks={k: 40 for k in SIX})
+    add_hands(db_session, deep, [False] * 30)
+    groups = {g.stack_bucket: g for g in all_groups(find_leaks(db_session, StatsFilter()))}
+    assert groups["61-120"].notes == []
+    assert any("40bb" in n for n in groups["31-60"].notes)
+
+
+def test_detail_action_prefers_non_fold_on_ties(db_session):
+    add_chart(db_session)
+    tight_hero(db_session, 60)
+    report = find_leaks(db_session, StatsFilter())
+    detail = leak_detail(db_session, StatsFilter(), report.leaks[0].key)
+    assert detail.action == "raise"
+
+
+def test_nash_mapped_actions_are_approximate(db_session):
+    classes = [PREMIUMS[i % 6] for i in range(60)]
+    add_hands(db_session, classes, [True] * 60, stacks=TEN, fmt=GameFormat.MTT)  # min-raises
+    g = all_groups(find_leaks(db_session, StatsFilter()))[0]
+    assert g.source == "nash" and g.approximate
+    assert any("asimilaron a push/fold" in n for n in g.notes)
+
+
+def test_unresolvable_nash_spot_has_its_own_warning(db_session):
+    add_hands(db_session, ["AA"], [True], stacks=TEN, fmt=GameFormat.MTT)
+    for d in db_session.query(HandDecision):
+        d.spot = {"stacks_bb": {"UTG": 10.0}, "ante_bb": 0.0}
+    db_session.commit()
+    report = find_leaks(db_session, StatsFilter())
+    assert any("1 decisiones de push/fold no se pudieron evaluar" in w for w in report.warnings)
+    assert not any("sin tabla" in w for w in report.warnings)
+    assert all_groups(report) == []
+
+
+def add_vs_shove(session, classes, calls):
+    for cls, called in zip(classes, calls, strict=True):
+        record = make_hand(
+            TEN,
+            [
+                act("p", "U", "raise", 10, all_in=True),
+                act("p", "H", "fold"),
+                act("p", "C", "fold"),
+                act("p", "Hero", "call", 10, all_in=True) if called else act("p", "Hero", "fold"),
+            ],
+            button="Hero",
+            hero_cards=cards(cls),
+            hand_id=str(next(_counter)),
+            game_type=GameFormat.MTT,
+        )
+        session.add(hand_row(record, "", None))
+    session.commit()
+
+
+def test_vs_allin_nash_fold_loses_ev(db_session):
+    add_vs_shove(db_session, ["AA", "KK", "QQ", "JJ", "TT", "AKs"] * 10, [False] * 60)
+    g = find_leaks(db_session, StatsFilter()).leaks[0]
+    assert g.source == "nash" and g.situation == "vs_allin" and g.vs_position == "LJ"
+    assert {a.action for a in g.actions} == {"call", "fold"}
+    assert g.ev_loss_bb > 0
+
+
+def test_vs_allin_nash_call_is_correct(db_session):
+    add_vs_shove(db_session, ["AA", "KK", "QQ", "JJ", "TT", "AKs"] * 10, [True] * 60)
+    report = find_leaks(db_session, StatsFilter())
+    g = all_groups(report)[0]
+    assert report.leaks == [] and g.ev_loss_bb == 0 and not g.approximate
+    assert next(a for a in g.actions if a.action == "call").observed == 1.0
