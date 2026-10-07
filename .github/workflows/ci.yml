@@ -27,6 +27,26 @@ jobs:
       - name: Benchmark
         run: scripts/bench.ps1 5000000
 
+      - name: Cache TexasSolver
+        id: texassolver
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/TexasSolver
+          key: texassolver-v0.2.0-windows
+
+      - name: Download TexasSolver (AGPL, external binary; not part of the repo)
+        if: steps.texassolver.outputs.cache-hit != 'true'
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'ts.zip'
+          Invoke-WebRequest https://github.com/bupticybee/TexasSolver/releases/download/v0.2.0/TexasSolver-v0.2.0-Windows.zip -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($hash -ne '0A9122FA0CD9384E6C1CBE0492E8A3B8AC7809890C649E1A53F77A59D6D50A7C') { throw "Hash inesperado: $hash" }
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'TexasSolver')
+
+      - name: Point the backend at TexasSolver
+        run: |
+          "POKER_SOLVER_PATH=$env:RUNNER_TEMP\TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe" | Out-File -Append $env:GITHUB_ENV
+
       - name: Backend
         run: scripts/test.ps1 backend
 
