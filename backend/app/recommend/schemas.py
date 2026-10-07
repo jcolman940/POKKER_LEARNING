@@ -9,6 +9,22 @@ class ActionOut(BaseModel):
     action: str  # fold / call / raise / 3bet / allin ...
     frequency: float
     ev: float | None = None
+    label: str | None = None  # e.g. "Bet 75% (6bb)" when an action has several sizes
+    amount_bb: float | None = None
+
+
+class PendingJobOut(BaseModel):
+    id: int
+    status: str
+    iteration: int
+    exploitability: float | None
+    position: int | None  # place in the queue (1 = next), None when running
+
+
+class StrategyLayerOut(BaseModel):
+    action: str
+    label: str
+    grid: list[float]  # 169 classes, range weight x frequency
 
 
 class RecommendationOut(BaseModel):
@@ -24,3 +40,5 @@ class RecommendationOut(BaseModel):
     reference: str | None = None  # where the numbers come from
     explanation: list[str] = []
     warnings: list[str] = []
+    pending_job: PendingJobOut | None = None
+    strategy_grid: list[StrategyLayerOut] = []

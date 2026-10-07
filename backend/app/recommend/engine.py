@@ -4,7 +4,7 @@ Preflop:
 - tournaments at <= `pushfold_max_bb` effective, folded to hero or facing a shove:
   push/fold Nash (+ ICM when payouts are given), computed on the fly.
 - otherwise: the closest stored chart (marked approximate when conditions differ).
-Postflop sources (solver, multiway heuristics) arrive in later phases.
+Postflop: heads-up solver (TexasSolver, with cache and queue) or multiway heuristic.
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from app.recommend.charts import (
     ChartSource,
     find_chart,
 )
+from app.recommend.postflop_heuristic import recommend_heuristic
+from app.recommend.postflop_solver import recommend_solver
 from app.recommend.preflop_equity import (
     class_index,
     combos_per_class,
@@ -236,9 +238,9 @@ def _pct(grid: np.ndarray) -> str:
 
 def recommend(scenario: Scenario, session: Session) -> RecommendationOut:
     if scenario.street != Street.PREFLOP:
-        return unavailable(
-            "Postflop: el solver heads-up y las heurísticas multiway llegan en la fase 5."
-        )
+        if len(scenario.villains) == 1:
+            return recommend_solver(scenario, session)
+        return recommend_heuristic(scenario)
     if not scenario.hero_position:
         return unavailable("Indicá la posición de Hero para obtener una recomendación.")
     if not scenario.situation:

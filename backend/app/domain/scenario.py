@@ -59,6 +59,11 @@ class Scenario(BaseModel):
     hero_position: str | None = None
     hero_hand: str
     villains: list[Villain] = Field(min_length=1)
+    # Postflop solver inputs. Hero's range is required for a heads-up solve; the UI can
+    # prefill it (and the villain's) from the preflop charts, flagging approximations.
+    hero_range: str | None = None
+    ranges_approximate: bool = False
+    solver_preset: str = "simple"
     board: str = ""
     pot_bb: Amount = 0.0
     to_call_bb: Amount = 0.0
@@ -113,6 +118,15 @@ class Scenario(BaseModel):
                 pokercore.range_combos(v.range)
             except ValueError as e:
                 raise ValueError(f"Rango inválido del rival {i}: {e}") from e
+
+        if self.hero_range is not None:
+            if not self.hero_range.strip():
+                self.hero_range = None
+            else:
+                try:
+                    pokercore.range_combos(self.hero_range)
+                except ValueError as e:
+                    raise ValueError(f"Rango inválido de Hero: {e}") from e
 
         valid_positions = set(position_names(self.num_players))
         given = [p for p in [self.hero_position, *(v.position for v in self.villains)] if p]

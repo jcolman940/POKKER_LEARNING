@@ -77,14 +77,20 @@ def test_missing_inputs_and_postflop(client):
     assert "No hay rangos" in rec(client)["message"]
     assert "posición de Hero" in rec(client, hero_position=None)["message"]
     assert "situación" in rec(client, situation=None)["message"]
-    assert "fase 5" in rec(client, board="Kh7s2c")["message"]
+    assert "rango de Hero" in rec(client, board="Kh7s2c")["message"]
 
 
 def test_push_fold_recommendation_in_tournaments(client):
     r = rec(client, format="mtt", effective_stack_bb=10, hero_hand="AhAd")
     assert r["source"] == "nash" and r["ev_unit"] == "bb"
     assert r["actions"][0] == pytest.approx(
-        {"action": "allin", "frequency": 1.0, "ev": r["actions"][0]["ev"]}
+        {
+            "action": "allin",
+            "frequency": 1.0,
+            "ev": r["actions"][0]["ev"],
+            "label": None,
+            "amount_bb": None,
+        }
     )
     assert r["actions"][0]["ev"] > r["actions"][1]["ev"]
 
