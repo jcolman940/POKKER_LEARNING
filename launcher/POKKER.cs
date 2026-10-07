@@ -753,7 +753,23 @@ namespace Pokker
         {
             string oldExe = paths.ExePath + ".viejo";
             string oldApp = Path.Combine(paths.Root, "app.viejo");
-            if (!File.Exists(oldExe) && !Directory.Exists(oldApp)) { return; }
+            if (!Directory.Exists(paths.AppDir) && Directory.Exists(oldApp))
+            {
+                // An update died between "app -> app.viejo" and "new app -> app": app.viejo is the
+                // only complete version, so bring it back instead of deleting it.
+                try
+                {
+                    Fs.Move(oldApp, paths.AppDir, true);
+                    Log.Write("No hab\u00eda carpeta app: restaur\u00e9 app.viejo como app");
+                }
+                catch (Exception e)
+                {
+                    Log.Write("No hay carpeta app y no pude restaurar app.viejo: " + e.Message);
+                    oldApp = null;   // never delete the only copy
+                }
+            }
+            if (oldApp != null && !Directory.Exists(oldApp)) { oldApp = null; }
+            if (!File.Exists(oldExe) && oldApp == null) { return; }
             Thread t = new Thread(delegate()
             {
                 for (int i = 0; i < 20 && (File.Exists(oldExe) || Directory.Exists(oldApp)); i++)
@@ -917,7 +933,12 @@ namespace Pokker
         {
             get
             {
-                int i = HtmlUrl != null ? HtmlUrl.IndexOf("/releases/", StringComparison.OrdinalIgnoreCase) : -1;
+                // Only a GitHub page is opened; anything else from the feed falls back to ours.
+                if (HtmlUrl == null || !HtmlUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Program.ReleasesUrl;
+                }
+                int i = HtmlUrl.IndexOf("/releases/", StringComparison.OrdinalIgnoreCase);
                 return i > 0 ? HtmlUrl.Substring(0, i) + "/releases" : Program.ReleasesUrl;
             }
         }
@@ -958,9 +979,11 @@ namespace Pokker
     // GitHub's redirect hosts. http://127.0.0.1 only with --permitir-feed-local (tests).
     sealed class UrlPolicy
     {
+        // GitHub's download hosts; github.com itself is only accepted under the repo's
+        // /releases/download/ path (first hop or redirect).
         static readonly string[] RedirectHosts =
         {
-            "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"
+            "objects.githubusercontent.com", "release-assets.githubusercontent.com"
         };
 
         readonly bool allowLocal;
@@ -1007,11 +1030,8 @@ namespace Pokker
             if (!Uri.TryCreate(url, UriKind.Absolute, out u)) { return "direcci\u00f3n inv\u00e1lida: " + url; }
             if (IsLocal(u)) { return null; }
             if (u.Scheme != Uri.UriSchemeHttps) { return "solo se acepta https: " + url; }
-            if (firstHop)
-            {
-                if (u.Host == "github.com" && u.AbsolutePath.ToLowerInvariant().StartsWith(downloadPrefix)) { return null; }
-                return "no es una descarga de las releases de POKKER: " + url;
-            }
+            if (u.Host == "github.com" && u.AbsolutePath.ToLowerInvariant().StartsWith(downloadPrefix)) { return null; }
+            if (firstHop) { return "no es una descarga de las releases de POKKER: " + url; }
             if (Array.IndexOf(RedirectHosts, u.Host) >= 0) { return null; }
             return "redirecci\u00f3n a un host no permitido: " + u.Host;
         }
@@ -1021,7 +1041,9 @@ namespace Pokker
     // contacted (and ResponseUri is checked again).
     static class Net
     {
-        public static HttpWebResponse Open(string url, UrlPolicy policy, bool feed, string userAgent, int timeoutMs)
+        // timeoutMs: connect/response; readTimeoutMs: each read of the body.
+        public static HttpWebResponse Open(string url, UrlPolicy policy, bool feed, string userAgent, int timeoutMs,
+                                           int readTimeoutMs)
         {
             for (int hop = 0; hop < 6; hop++)
             {
@@ -1033,7 +1055,7 @@ namespace Pokker
                 req.UserAgent = userAgent;
                 req.Accept = feed ? "application/vnd.github+json" : "application/octet-stream";
                 req.Timeout = timeoutMs;
-                req.ReadWriteTimeout = Math.Max(timeoutMs, 30000);
+                req.ReadWriteTimeout = readTimeoutMs;
                 if (policy.IsLocal(url)) { req.Proxy = null; }
                 HttpWebResponse resp;
                 try { resp = (HttpWebResponse)req.GetResponse(); }
@@ -1066,7 +1088,7 @@ namespace Pokker
 
         public static string ReadString(string url, UrlPolicy policy, bool feed, string userAgent, int timeoutMs, int maxBytes)
         {
-            using (HttpWebResponse resp = Open(url, policy, feed, userAgent, timeoutMs))
+            using (HttpWebResponse resp = Open(url, policy, feed, userAgent, timeoutMs, timeoutMs))
             using (Stream s = resp.GetResponseStream())
             using (MemoryStream ms = new MemoryStream())
             {
@@ -1085,7 +1107,7 @@ namespace Pokker
         public static void ToFile(string url, UrlPolicy policy, string userAgent, string path,
                                   Action<long, long> progress, Func<bool> cancel)
         {
-            using (HttpWebResponse resp = Open(url, policy, false, userAgent, 15000))
+            using (HttpWebResponse resp = Open(url, policy, false, userAgent, 15000, 30000))
             using (Stream s = resp.GetResponseStream())
             using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
             {
@@ -1336,6 +1358,8 @@ namespace Pokker
             }
             Log.Write("Actualizaciones: hay una versi\u00f3n nueva " + r.Version + " (tengo " + current + ")");
             if (!Accept(paths, r, Ask(r, current, opt))) { return; }
+            // Before stopping the server: a read-only folder must not cost the user a restart.
+            if (!CheckWritable(paths, opt, current)) { return; }
             ServerStatus s = tray.Server.GetStatus();
             if (s != null && s.Work > 0)
             {
@@ -1411,17 +1435,22 @@ namespace Pokker
             catch (Exception e) { Log.Write("No pude escribir launcher.json: " + e.Message); }
         }
 
+        // Probe file in Root; when it fails, says so (only logged when unattended) and returns false.
+        static bool CheckWritable(Paths paths, Options opt, string current)
+        {
+            if (paths.RootWritable()) { return true; }
+            Log.Write("No puedo actualizar: la carpeta " + paths.Root + " no es escribible");
+            bool quiet = Unattended(opt);
+            Ui.Notice(quiet, "No puedo actualizar en esta carpeta: mov\u00e9 POKKER a Documentos (u otra carpeta tuya).\n\n" +
+                      paths.Root + "\n\nSigo con la versi\u00f3n " + current + ".", MessageBoxIcon.Warning);
+            return false;
+        }
+
         // Spec 4.3. The server must not be running. Messages are only logged when unattended.
         public static ApplyResult Apply(Paths paths, Options opt, Release r, string current)
         {
+            if (!CheckWritable(paths, opt, current)) { return ApplyResult.Failed; }
             bool quiet = Unattended(opt);
-            if (!paths.RootWritable())
-            {
-                Log.Write("No puedo actualizar: la carpeta " + paths.Root + " no es escribible");
-                Ui.Notice(quiet, "No puedo actualizar en esta carpeta: mov\u00e9 POKKER a Documentos (u otra carpeta tuya).\n\n" +
-                          paths.Root + "\n\nSigo con la versi\u00f3n " + current + ".", MessageBoxIcon.Warning);
-                return ApplyResult.Failed;
-            }
             UpdateJob job = new UpdateJob(paths, opt, r, current);
             ProgressDialog.Run("Actualizando POKKER a " + r.Version, job.Run);
             if (job.Result == ApplyResult.Failed)
@@ -1483,9 +1512,12 @@ namespace Pokker
                 // 1. Download (+ .sha256) and verify.
                 Directory.CreateDirectory(paths.UpdatesDir);
                 string shaText = Net.ReadString(release.ShaUrl, policy, false, ua, 15000, 4096);
-                string expected = shaText.Trim().Split(new char[] { ' ', '\t', '\r', '\n', '*' },
-                                                       StringSplitOptions.RemoveEmptyEntries)[0].ToUpperInvariant();
-                if (expected.Length != 64) { throw new UpdateException("el archivo .sha256 no tiene un hash v\u00e1lido"); }
+                string expected = ParseSha256(shaText);
+                if (expected == null)
+                {
+                    Log.Write("Contenido del .sha256 rechazado: " + shaText.Substring(0, Math.Min(shaText.Length, 100)).Trim());
+                    throw new UpdateException("El archivo de verificaci\u00f3n de la actualizaci\u00f3n no es v\u00e1lido");
+                }
                 ui.SetStage("Descargando POKKER " + release.Version + "\u2026");
                 bool cancelForTest = opt.TestAnswer == "cancelar";
                 Net.ToFile(release.ZipUrl, policy, ua, zip,
@@ -1508,7 +1540,7 @@ namespace Pokker
                 // 2. Unpack into app.nuevo and validate it.
                 ui.SetStage("Descomprimiendo\u2026");
                 rb.Add("borrar app.nuevo", delegate { Fs.DeleteDir(NewDir); });
-                System.IO.Compression.ZipFile.ExtractToDirectory(zip, NewDir);
+                SafeExtract(zip, NewDir);
                 string pkg = PackageRoot(NewDir);
                 foreach (string piece in Paths.Pieces)
                 {
@@ -1522,8 +1554,9 @@ namespace Pokker
                 {
                     throw new UpdateException("el paquete dice ser la versi\u00f3n " + newVersion + " y no " + release.Version);
                 }
-                CheckCancel(ui);
-                ui.DisableCancel();   // from here on the swap is quick and must not be interrupted
+                // From here on the swap is quick and must not be interrupted. LockCancel is atomic
+                // with the Cancelar click, so a click that raced in is still honoured here.
+                if (!ui.LockCancel()) { throw new OperationCanceledException(); }
 
                 // 3. Copy of the database (the server is not running).
                 ui.SetStage("Guardando una copia de tus datos\u2026");
@@ -1543,7 +1576,7 @@ namespace Pokker
                 string zipExe = Path.Combine(pkg, "POKKER.exe");
                 if (!File.Exists(zipExe))
                 {
-                    Log.Write("El paquete no trae POKKER.exe: sigo con el lanzador actual");
+                    Log.Write("AVISO: el paquete de la actualizaci\u00f3n no trae POKKER.exe: sigo con el lanzador actual");
                 }
                 else if (Fs.Sha256(zipExe) == Fs.Sha256(paths.ExePath))
                 {
@@ -1591,6 +1624,57 @@ namespace Pokker
             }
         }
 
+        // First token of a .sha256 file ("HASH" or "HASH  name"), BOM and whitespace ignored;
+        // uppercase, or null unless it is exactly 64 hex digits.
+        public static string ParseSha256(string text)
+        {
+            if (text == null) { return null; }
+            string t = text.Replace("\ufeff", "").Trim();
+            string[] tokens = t.Split(new char[] { ' ', '\t', '\r', '\n', '*' }, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0 || tokens[0].Length != 64) { return null; }
+            foreach (char c in tokens[0])
+            {
+                bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                if (!hex) { return null; }
+            }
+            return tokens[0].ToUpperInvariant();
+        }
+
+        // Extracts entry by entry, refusing the whole zip when any entry's destination is outside
+        // dir (zip-slip), instead of relying on ExtractToDirectory's own check.
+        static void SafeExtract(string zip, string dir)
+        {
+            string root = Path.GetFullPath(dir).TrimEnd('\\') + "\\";
+            using (System.IO.Compression.ZipArchive archive = System.IO.Compression.ZipFile.OpenRead(zip))
+            {
+                foreach (System.IO.Compression.ZipArchiveEntry entry in archive.Entries)
+                {
+                    if (!EntryPath(root, entry).StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new UpdateException("el paquete trae una ruta no permitida: " + entry.FullName);
+                    }
+                }
+                Directory.CreateDirectory(root);
+                foreach (System.IO.Compression.ZipArchiveEntry entry in archive.Entries)
+                {
+                    string dest = EntryPath(root, entry);
+                    if (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\"))
+                    {
+                        Directory.CreateDirectory(dest);
+                        continue;
+                    }
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                    System.IO.Compression.ZipFileExtensions.ExtractToFile(entry, dest, false);
+                }
+            }
+        }
+
+        static string EntryPath(string root, System.IO.Compression.ZipArchiveEntry entry)
+        {
+            try { return Path.GetFullPath(Path.Combine(root, entry.FullName.Replace('/', '\\'))); }
+            catch (Exception) { throw new UpdateException("el paquete trae una ruta no v\u00e1lida: " + entry.FullName); }
+        }
+
         static void CheckCancel(ProgressDialog ui)
         {
             if (ui.Cancelled) { throw new OperationCanceledException(); }
@@ -1610,15 +1694,30 @@ namespace Pokker
         {
             string db = Path.Combine(paths.DataDir, "poker.sqlite3");
             if (!File.Exists(db)) { Log.Write("No hay base de datos todav\u00eda: no hago copia"); return; }
+            // Copy into a fresh temp folder, then swap it in: datos.anterior is either the previous
+            // complete copy or the new complete copy, never a mix.
             string dest = paths.PreviousDataDir;
-            Directory.CreateDirectory(dest);
+            string tmp = dest + ".tmp";
+            string old = dest + ".old";
+            Fs.DeleteDir(tmp);
+            Fs.DeleteDir(old);
+            Directory.CreateDirectory(tmp);
             foreach (string suffix in new string[] { "", "-wal", "-shm" })
             {
                 string src = db + suffix;
-                string dst = Path.Combine(dest, "poker.sqlite3" + suffix);
-                if (File.Exists(src)) { File.Copy(src, dst, true); }
-                else if (File.Exists(dst)) { File.Delete(dst); }   // stale companion of an older copy
+                if (File.Exists(src)) { File.Copy(src, Path.Combine(tmp, "poker.sqlite3" + suffix), false); }
             }
+            if (Directory.Exists(dest)) { Fs.Move(dest, old, true); }
+            try
+            {
+                Fs.Move(tmp, dest, true);
+            }
+            catch
+            {
+                if (Directory.Exists(old) && !Directory.Exists(dest)) { Fs.Move(old, dest, true); }
+                throw;
+            }
+            try { Fs.DeleteDir(old); } catch (Exception e) { Log.Write("No pude borrar " + old + ": " + e.Message); }
             Log.Write("Copia de la base en " + dest);
         }
     }
@@ -1741,14 +1840,31 @@ namespace Pokker
 
         public bool Cancelled { get { return cancelled; } }
 
+        readonly object cancelGate = new object();
+        bool cancelLocked;
+
         public void Cancel()
         {
-            if (cancelled) { return; }
-            cancelled = true;
+            lock (cancelGate)
+            {
+                if (cancelled || cancelLocked) { return; }
+                cancelled = true;
+            }
             OnUi(delegate { cancel.Enabled = false; stage.Text = "Cancelando\u2026"; });
         }
 
-        public void DisableCancel() { OnUi(delegate { cancel.Enabled = false; }); }
+        // Ends the cancellable part: false when Cancelar was already pressed (the caller rolls
+        // back); true when later clicks are ignored from now on.
+        public bool LockCancel()
+        {
+            lock (cancelGate)
+            {
+                if (cancelled) { return false; }
+                cancelLocked = true;
+            }
+            OnUi(delegate { cancel.Enabled = false; });
+            return true;
+        }
 
         public void SetStage(string text) { OnUi(delegate { if (!cancelled) { stage.Text = text; } }); }
 
