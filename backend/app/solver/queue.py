@@ -1,0 +1,327 @@
+"""Persistent solve queue (SQLite) and the single background worker.
+
+One solve runs at a time (the solver already uses every core). A simulator request
+preempts a running batch/library job, which goes back to the queue.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import shutil
+import subprocess
+import threading
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from pathlib import Path
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db.models import AppMeta, SolverJob, SolverResult
+from app.solver.cache import store_result
+from app.solver.config_gen import generate_config
+from app.solver.output_parser import parse_output
+from app.solver.runner import Progress, SolverError, SolverStopped, kill_tree, run_solver
+from app.solver.spot import SolverSpot
+
+log = logging.getLogger(__name__)
+
+PAUSED_KEY = "solver_queue_paused"
+KEEP_FAILED_DIRS = 5
+
+
+class Origin(StrEnum):
+    SIMULATOR = "simulator"
+    BATCH = "batch"
+    LIBRARY = "library"
+
+
+PRIORITY = {Origin.SIMULATOR: 0, Origin.BATCH: 10, Origin.LIBRARY: 20}
+
+
+class JobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+ACTIVE = {JobStatus.QUEUED, JobStatus.RUNNING}
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def enqueue(
+    session: Session, spot: SolverSpot, origin: Origin, library_key: str | None = None
+) -> SolverJob:
+    spot_hash = spot.spot_hash()
+    priority = PRIORITY[origin]
+    active = session.scalars(
+        select(SolverJob).where(SolverJob.spot_hash == spot_hash, SolverJob.status.in_(ACTIVE))
+    ).first()
+    if active is not None:
+        if priority < active.priority:
+            active.priority = priority
+            session.commit()
+        return active
+    cached = session.get(SolverResult, spot_hash) is not None
+    job = SolverJob(
+        spot_hash=spot_hash,
+        spot=spot.to_json(),
+        label=spot.label(),
+        origin=origin,
+        priority=priority,
+        status=JobStatus.DONE if cached else JobStatus.QUEUED,
+        iteration=0,
+        library_key=library_key,
+        finished_at=_now() if cached else None,
+    )
+    session.add(job)
+    session.commit()
+    return job
+
+
+def _queued(session: Session):
+    return (
+        select(SolverJob)
+        .where(SolverJob.status == JobStatus.QUEUED)
+        .order_by(SolverJob.priority, SolverJob.id)
+    )
+
+
+def next_job(session: Session) -> SolverJob | None:
+    return session.scalars(_queued(session).limit(1)).first()
+
+
+def queue_position(session: Session, job: SolverJob) -> int | None:
+    if job.status != JobStatus.QUEUED:
+        return None
+    ids = list(session.scalars(_queued(session).with_only_columns(SolverJob.id)))
+    return ids.index(job.id) + 1
+
+
+def _get(session: Session, job_id: int) -> SolverJob:
+    job = session.get(SolverJob, job_id)
+    if job is None:
+        raise ValueError(f"No existe el trabajo {job_id}")
+    return job
+
+
+def cancel_job(session: Session, job_id: int) -> SolverJob:
+    job = _get(session, job_id)
+    if job.status not in ACTIVE:
+        raise ValueError("Solo se puede cancelar un trabajo en cola o corriendo")
+    job.status = JobStatus.CANCELLED  # a running worker sees this and stops the solver
+    job.finished_at = _now()
+    session.commit()
+    return job
+
+
+def retry_job(session: Session, job_id: int) -> SolverJob:
+    job = _get(session, job_id)
+    if job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):
+        raise ValueError("Solo se puede reintentar un trabajo fallido o cancelado")
+    job.status = JobStatus.QUEUED
+    job.error = None
+    job.iteration = 0
+    job.exploitability = None
+    job.finished_at = None
+    session.commit()
+    return job
+
+
+def _is_solver_process(pid: int) -> bool:
+    """True only if `pid` is alive AND is a TexasSolver process (PIDs get reused).
+
+    Never use os.kill(pid, 0) for this on Windows: there it calls TerminateProcess.
+    """
+    if os.name == "nt":
+        out = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+        ).stdout.lower()
+        return "console_solver" in out
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace").lower()
+    except OSError:
+        return False
+    return "console_solver" in cmdline
+
+
+def recover_jobs(session: Session) -> int:
+    """Startup: jobs left running by a previous backend go back to the queue."""
+    jobs = session.scalars(select(SolverJob).where(SolverJob.status == JobStatus.RUNNING)).all()
+    for job in jobs:
+        if job.pid and _is_solver_process(job.pid):
+            kill_tree(job.pid)
+        job.status = JobStatus.QUEUED
+        job.pid = None
+        job.started_at = None
+    session.commit()
+    return len(jobs)
+
+
+def is_paused(session: Session) -> bool:
+    meta = session.get(AppMeta, PAUSED_KEY)
+    return meta is not None and meta.value == "1"
+
+
+def set_paused(session: Session, paused: bool) -> None:
+    session.merge(AppMeta(key=PAUSED_KEY, value="1" if paused else "0"))
+    session.commit()
+
+
+class SolverWorker:
+    def __init__(
+        self,
+        session_factory: Callable[[], Session],
+        solver_path: Path,
+        data_dir: Path,
+        *,
+        threads: int,
+        timeout_s: float,
+        poll_s: float = 1.0,
+        run_poll_s: float = 0.5,
+    ):
+        self._sessions = session_factory
+        self._solver_path = solver_path
+        self._jobs_dir = data_dir / "solver" / "jobs"
+        self._threads = threads
+        self._timeout_s = timeout_s
+        self._poll_s = poll_s
+        self._run_poll_s = run_poll_s
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        with self._sessions() as session:
+            recover_jobs(session)
+        self._thread = threading.Thread(target=self._loop, name="solver-worker", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=10)
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                worked = self.run_once()
+            except Exception:  # keep the worker alive; the job itself records errors
+                log.exception("solver worker iteration failed")
+                worked = False
+            if not worked:
+                self._stop.wait(self._poll_s)
+
+    def run_once(self) -> bool:
+        with self._sessions() as session:
+            if is_paused(session):
+                return False
+            job = next_job(session)
+            if job is None:
+                return False
+            job.status = JobStatus.RUNNING
+            job.started_at = _now()
+            job.iteration = 0
+            session.commit()
+            job_id, priority = job.id, job.priority
+            spot = SolverSpot.from_json(job.spot)
+            library_key = job.library_key
+
+        workdir = self._jobs_dir / str(job_id)
+        started = time.monotonic()
+        try:
+            raw, progress = run_solver(
+                generate_config(spot, self._threads),
+                workdir,
+                self._solver_path,
+                timeout_s=self._timeout_s,
+                on_start=lambda pid: self._update(job_id, pid=pid),
+                on_progress=lambda p: self._update(
+                    job_id, iteration=p.iteration, exploitability=p.exploitability
+                ),
+                should_stop=lambda: self._should_stop(job_id, priority),
+                poll_s=self._run_poll_s,
+            )
+            tree = parse_output(raw, spot.stack_bb)
+        except SolverStopped as stop:
+            self._finish_stopped(job_id, stop.reason)
+            shutil.rmtree(workdir, ignore_errors=True)
+            return True
+        except (SolverError, ValueError) as e:
+            self._finish(job_id, JobStatus.FAILED, error=str(e))
+            self._prune_failed()
+            return True
+
+        with self._sessions() as session:
+            store_result(session, spot, tree, progress, time.monotonic() - started, library_key)
+        self._finish(job_id, JobStatus.DONE, progress=progress)
+        shutil.rmtree(workdir, ignore_errors=True)
+        return True
+
+    def _update(self, job_id: int, **fields) -> None:
+        with self._sessions() as session:
+            job = session.get(SolverJob, job_id)
+            for k, v in fields.items():
+                setattr(job, k, v)
+            session.commit()
+
+    def _should_stop(self, job_id: int, priority: int) -> str | None:
+        if self._stop.is_set():
+            return "shutdown"
+        with self._sessions() as session:
+            if session.get(SolverJob, job_id).status == JobStatus.CANCELLED:
+                return "cancelled"
+            if priority > 0:
+                urgent = session.scalars(
+                    _queued(session).where(SolverJob.priority < priority).limit(1)
+                ).first()
+                if urgent is not None:
+                    return "preempted"
+        return None
+
+    def _finish_stopped(self, job_id: int, reason: str) -> None:
+        with self._sessions() as session:
+            job = session.get(SolverJob, job_id)
+            job.pid = None
+            if reason in ("preempted", "shutdown"):
+                job.status = JobStatus.QUEUED
+                job.started_at = None
+            session.commit()  # cancelled jobs already have their final status
+
+    def _finish(
+        self,
+        job_id: int,
+        status: JobStatus,
+        *,
+        error: str | None = None,
+        progress: Progress | None = None,
+    ) -> None:
+        with self._sessions() as session:
+            job = session.get(SolverJob, job_id)
+            job.status = status
+            job.error = error
+            job.pid = None
+            job.finished_at = _now()
+            if progress:
+                job.iteration = progress.iteration
+                job.exploitability = progress.exploitability
+            session.commit()
+
+    def _prune_failed(self) -> None:
+        if not self._jobs_dir.exists():
+            return
+        dirs = sorted(
+            (d for d in self._jobs_dir.iterdir() if d.is_dir()),
+            key=lambda d: d.stat().st_mtime,
+        )
+        for d in dirs[:-KEEP_FAILED_DIRS]:
+            shutil.rmtree(d, ignore_errors=True)
