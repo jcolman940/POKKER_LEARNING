@@ -73,6 +73,24 @@ const pct = (v: number) => `${Math.round(v * 100)}%`
 const impactText = (g: LeakGroup) => `${g.impact.toFixed(1).replace('.', ',')} ${g.impact_unit}`
 const actionName = (a: string) => ACTION_LABEL[a] ?? a
 
+const VERBS: Record<string, [string, string]> = {
+  raise: ['Abrís', 'abre'],
+  allin: ['Empujás', 'empuja'],
+  call: ['Pagás', 'paga'],
+  '3bet': ['3-beteás', '3-betea'],
+  fold: ['Foldeás', 'foldea'],
+  limp: ['Limpeás', 'limpea'],
+}
+
+function summaryText(g: LeakGroup, action: string): string | null {
+  const a = g.actions.find((x) => x.action === action)
+  if (!a) return null
+  const [you, ref] = VERBS[action] ?? [`Jugás ${actionName(action)}`, `juega ${actionName(action)}`]
+  const subject = g.source === 'nash' ? 'Nash' : 'tu tabla'
+  const ci = `IC ${Math.round(a.ci_low * 100)}–${pct(a.ci_high)}`
+  return `${you} ${pct(a.observed)} desde ${g.position}; ${subject} ${ref} ${pct(a.expected)} (n=${g.n}, ${ci})`
+}
+
 function spotText(g: LeakGroup): string {
   const vs = g.vs_position ? ` vs ${g.vs_position}` : ''
   const sit = SITUATION_TEXT[g.situation] ?? g.situation
@@ -109,7 +127,6 @@ function LeakDetailView({
 
   const more = detail ? detail.grid.map((v) => (v !== null && v > 0 ? Math.min(1, v) : 0)) : []
   const less = detail ? detail.grid.map((v) => (v !== null && v < 0 ? Math.min(1, -v) : 0)) : []
-  const significant = group.actions.filter((a) => a.significant)
 
   return (
     <div className="leak-detail">
@@ -126,9 +143,8 @@ function LeakDetailView({
       {detail && (
         <>
           <p>
-            {significant.length > 0
-              ? `Jugás ${actionName(detail.action)} distinto a lo esperado en ${spotText(group)}.`
-              : `Sin desvíos significativos en ${spotText(group)}.`}
+            {summaryText(group, detail.action) ??
+              `Sin desvíos significativos en ${spotText(group)}.`}
           </p>
           {detail.top_classes.length > 0 && (
             <table className="metrics-table">
@@ -233,9 +249,13 @@ export function LeaksPanel({
   filters: Filters
   onTrain: (f: InitialFilters) => void
 }) {
-  const [report, setReport] = useState<LeakReport | null>(null)
+  // Results are tied to the filters they were fetched with, so a filter change
+  // hides the stale report and any open detail immediately.
+  const [loaded, setLoaded] = useState<{ filters: Filters; report: LeakReport } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [openKey, setOpenKey] = useState<string | null>(null)
+  const [open, setOpen] = useState<{ filters: Filters; key: string } | null>(null)
+  const report = loaded?.filters === filters ? loaded.report : null
+  const openKey = open?.filters === filters ? open.key : null
   const request = useRef(0)
 
   useEffect(() => {
@@ -244,9 +264,8 @@ export function LeaksPanel({
     getJson<LeakReport>(`/api/leaks${filterQuery(filters)}`, controller.signal)
       .then((r) => {
         if (id !== request.current) return
-        setReport(r)
+        setLoaded({ filters, report: r })
         setError(null)
-        setOpenKey(null)
       })
       .catch((e: unknown) => {
         if (controller.signal.aborted || id !== request.current) return
@@ -262,7 +281,7 @@ export function LeaksPanel({
           key={g.key}
           group={g}
           open={openKey === g.key}
-          onToggle={() => setOpenKey(openKey === g.key ? null : g.key)}
+          onToggle={() => setOpen(openKey === g.key ? null : { filters, key: g.key })}
           filters={filters}
           onTrain={onTrain}
         />

@@ -27,6 +27,9 @@ const GRAPH = [
 describe('StatsPage', () => {
   it('shows metrics with CI, sample flags, chart and tournaments', async () => {
     const fetchMock = mockApi({
+      'GET /api/leaks': () => ({
+        json: { total_hands: 0, min_sample: 30, leaks: [], insufficient: [], other: [], warnings: [] },
+      }),
       'GET /api/stats/graph': () => ({ json: GRAPH }),
       'GET /api/stats/tournaments': () => ({
         json: {

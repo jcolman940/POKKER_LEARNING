@@ -84,6 +84,8 @@ describe('LeaksPanel', () => {
     const detailUrl = fetchMock.mock.calls.map((c) => String(c[0])).find((u) => u.includes('/detail'))!
     expect(detailUrl).toContain(`key=${encodeURIComponent('cash|6|BTN|rfi|-|61-120|chart')}`)
 
+    expect(screen.getByText('Abrís 18% desde BTN; tu tabla abre 45% (n=80, IC 15–23%)')).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: 'Entrenar este spot' }))
     expect(onTrain).toHaveBeenCalledWith({
       positions: ['BTN'],
@@ -91,6 +93,25 @@ describe('LeaksPanel', () => {
       formats: ['cash'],
       sources: ['chart'],
     })
+  })
+
+  it('clears report and open detail when filters change', async () => {
+    const fetchMock = mockApi({
+      'GET /api/leaks/detail': () => ({ json: DETAIL }),
+      'GET /api/leaks': () => ({ json: REPORT }),
+    })
+    const { rerender } = render(<LeaksPanel filters={EMPTY_FILTERS} onTrain={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /BTN · RFI · cash 6/ }))
+    await screen.findAllByText('AKo')
+    const detailCalls = () =>
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes('/detail')).length
+    expect(detailCalls()).toBe(1)
+
+    rerender(<LeaksPanel filters={{ ...EMPTY_FILTERS, positions: ['CO'] }} onTrain={vi.fn()} />)
+    expect(screen.queryByText('BTN · RFI · cash 6 · 61-120bb')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Entrenar este spot' })).not.toBeInTheDocument()
+    await screen.findByText('BTN · RFI · cash 6 · 61-120bb')
+    expect(detailCalls()).toBe(1)
   })
 
   it('uses pushfold source for nash leaks', async () => {
