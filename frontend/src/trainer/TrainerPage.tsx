@@ -104,7 +104,15 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [noSpots, setNoSpots] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [sourcesError, setSourcesError] = useState(false)
+  const [payoutsError, setPayoutsError] = useState(false)
+  const [summaryError, setSummaryError] = useState(false)
   const busy = useRef(false)
+  const startingRef = useRef(false)
+  // Monotonic request id: any response from a superseded begin/next/answer is discarded.
+  const gen = useRef(0)
+  const mounted = useRef(true)
 
   const refreshErrors = useCallback(() => {
     fetchFrequentErrors()
@@ -114,30 +122,46 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
 
   useEffect(() => {
     const c = new AbortController()
+    mounted.current = true
     fetchSources(c.signal)
       .then(setSources)
-      .catch(() => {})
+      .catch(() => {
+        if (!c.signal.aborted) setSourcesError(true)
+      })
     fetchPayouts(c.signal)
       .then(setPayouts)
-      .catch(() => {})
+      .catch(() => {
+        if (!c.signal.aborted) setPayoutsError(true)
+      })
     refreshErrors()
-    return () => c.abort()
+    return () => {
+      mounted.current = false
+      c.abort()
+    }
   }, [refreshErrors])
 
-  const available = (id: TrainerSource) => sources === null || sources[id].available
+  // Unknown sources (request failed) are never enabled; while loading they stay selectable.
+  const available = (id: TrainerSource) => !sourcesError && (sources === null || sources[id].available)
+  const reasonFor = (id: TrainerSource) =>
+    sourcesError ? 'No se pudo consultar la disponibilidad' : sources?.[id].reason
   const chosen = filters.sources ?? HAND_SOURCES.map(([id]) => id)
   const selectedSources = (): TrainerSource[] =>
     HAND_SOURCES.map(([id]) => id).filter((id) => chosen.includes(id) && available(id))
 
   const loadNext = useCallback(async (id: number) => {
+    const my = ++gen.current
+    busy.current = false
     setSpot(null)
     setFeedback(null)
     setMessage(null)
     setNoSpots(false)
     setLoading(true)
     try {
-      setSpot(await nextSpot(id))
+      const next = await nextSpot(id)
+      if (my !== gen.current || !mounted.current) return
+      setSpot(next)
     } catch (err) {
+      if (my !== gen.current || !mounted.current) return
       if (err instanceof ApiError && err.status === 409) {
         setNoSpots(true)
         setConfigOpen(true)
@@ -145,13 +169,19 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
         setMessage(err instanceof Error ? err.message : 'No se pudo preparar el spot')
       }
     } finally {
-      setLoading(false)
+      if (my === gen.current && mounted.current) setLoading(false)
     }
   }, [])
 
   const begin = async (override?: Partial<SessionRequest>) => {
+    if (startingRef.current) return
+    startingRef.current = true
+    setStarting(true)
+    const my = ++gen.current
+    busy.current = false
     setMessage(null)
     setSummary(null)
+    setSummaryError(false)
     const body: SessionRequest = {
       sources: selectedSources(),
       formats: filters.formats,
@@ -165,12 +195,22 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
     }
     try {
       const { id } = await createSession(body)
+      if (my !== gen.current || !mounted.current) return
       setSessionId(id)
       setConfigOpen(false)
+      startingRef.current = false
+      setStarting(false)
       await loadNext(id)
     } catch (err) {
+      if (my !== gen.current || !mounted.current) return
       setSessionId(null)
+      setSpot(null)
+      setFeedback(null)
+      setNoSpots(false)
       setMessage(err instanceof Error ? err.message : 'No se pudo crear la sesión')
+    } finally {
+      startingRef.current = false
+      if (mounted.current) setStarting(false)
     }
   }
 
@@ -178,16 +218,22 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
     async (action: string) => {
       if (!spot || feedback || busy.current || sessionId === null) return
       busy.current = true
+      const my = gen.current
+      const live = () => my === gen.current && mounted.current
       try {
-        setFeedback(await answerSpot(spot.spot_id, action))
+        const fb = await answerSpot(spot.spot_id, action)
+        if (!live()) return
+        setFeedback(fb)
+        setSummaryError(false)
         fetchSummary(sessionId)
-          .then(setSummary)
-          .catch(() => {})
+          .then((s) => live() && setSummary(s))
+          .catch(() => live() && setSummaryError(true))
         refreshErrors()
       } catch (err) {
+        if (!live()) return
         setMessage(err instanceof Error ? err.message : 'No se pudo registrar la respuesta')
       } finally {
-        busy.current = false
+        if (live()) busy.current = false
       }
     },
     [spot, feedback, sessionId, refreshErrors],
@@ -259,9 +305,7 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
                         onChange={() => set({ sources: toggle(chosen, id) })}
                       />
                       {text}
-                      {disabled && sources?.[id].reason && (
-                        <span className="muted small"> {sources[id].reason}</span>
-                      )}
+                      {disabled && reasonFor(id) && <span className="muted small"> {reasonFor(id)}</span>}
                     </label>
                   )
                 })}
@@ -326,9 +370,24 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
                   </select>
                 </label>
               </div>
+              {sourcesError && (
+                <p className="error small" role="alert">
+                  No se pudieron cargar las fuentes disponibles.
+                </p>
+              )}
+              {payoutsError && (
+                <p className="error small" role="alert">
+                  No se pudieron cargar las estructuras de premios.
+                </p>
+              )}
             </>
           )}
-          <button type="button" className="primary" onClick={() => void begin()}>
+          <button
+            type="button"
+            className="primary"
+            disabled={starting || loading}
+            onClick={() => void begin()}
+          >
             Empezar
           </button>
           {message && sessionId === null && (
@@ -364,7 +423,13 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
           </>
         )}
       </div>
-      <SessionSidebar summary={summary} errors={errors} onTrainErrors={() => void trainErrors()} />
+      <SessionSidebar
+        summary={summary}
+        summaryError={summaryError}
+        errors={errors}
+        busy={starting || loading}
+        onTrainErrors={() => void trainErrors()}
+      />
     </div>
   )
 }

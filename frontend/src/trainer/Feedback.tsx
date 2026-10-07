@@ -38,7 +38,7 @@ export function Feedback({ feedback, onNext }: Props) {
                 />
               </span>
               <span className="rec-freq">{pct(a.frequency, 0)}</span>
-              {a.ev !== null && (
+              {a.ev != null && (
                 <span className="rec-ev muted">
                   EV {a.ev.toFixed(2)}
                   {rec.ev_unit}

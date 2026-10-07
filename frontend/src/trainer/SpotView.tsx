@@ -1,7 +1,7 @@
 import { ACTION_LABEL, FORMAT_LABEL } from '../ranges/labels'
 import { CardView } from '../simulator/CardView'
 import { splitCards } from '../simulator/cards'
-import { SITUATION_TEXT } from './format'
+import { actionForKey, SITUATION_TEXT } from './format'
 import type { Spot } from './types'
 
 interface Props {
@@ -9,11 +9,12 @@ interface Props {
   onAnswer?: (action: string) => void
 }
 
-function shortcut(action: string, index: number, offered: string[]): string {
-  const letter = action === 'fold' ? 'F' : ['call', 'limp', 'check'].includes(action) ? 'C' : null
-  if (letter) return letter
-  const firstAggressive = offered.find((a) => !['fold', 'call', 'limp', 'check'].includes(a))
-  return action === firstAggressive ? 'R' : String(index + 1)
+const KEYS = ['f', 'c', 'r', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+
+/** The key badge comes from actionForKey, so a badge never promises a missing shortcut. */
+function shortcut(action: string, offered: string[]): string | null {
+  const key = KEYS.find((k) => actionForKey(k, offered) === action)
+  return key ? key.toUpperCase() : null
 }
 
 export function SpotView({ spot, onAnswer }: Props) {
@@ -48,10 +49,10 @@ export function SpotView({ spot, onAnswer }: Props) {
       </div>
       {onAnswer && (
         <div className="trainer-actions" role="group" aria-label="Acciones">
-          {spot.offered.map((a, i) => (
+          {spot.offered.map((a) => (
             <button key={a} type="button" className={`trainer-action action-${a}`} onClick={() => onAnswer(a)}>
               {ACTION_LABEL[a] ?? a}
-              <kbd>{shortcut(a, i, spot.offered)}</kbd>
+              {shortcut(a, spot.offered) && <kbd>{shortcut(a, spot.offered)}</kbd>}
             </button>
           ))}
         </div>

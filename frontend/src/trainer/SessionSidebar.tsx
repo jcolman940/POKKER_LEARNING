@@ -3,11 +3,13 @@ import type { FrequentError, Summary } from './types'
 
 interface Props {
   summary: Summary | null
+  summaryError?: boolean
+  busy?: boolean
   errors: FrequentError[]
   onTrainErrors: () => void
 }
 
-export function SessionSidebar({ summary, errors, onTrainErrors }: Props) {
+export function SessionSidebar({ summary, summaryError = false, busy = false, errors, onTrainErrors }: Props) {
   return (
     <aside className="trainer-sidebar" aria-label="Sesión">
       <section className="panel">
@@ -24,6 +26,8 @@ export function SessionSidebar({ summary, errors, onTrainErrors }: Props) {
             )}
             {summary.avg_precision !== null && <li>Precisión media: {pct(summary.avg_precision, 0)}</li>}
           </ul>
+        ) : summaryError ? (
+          <p className="muted small">No se pudo cargar el resumen de la sesión.</p>
         ) : (
           <p className="muted small">Todavía no respondiste ningún spot.</p>
         )}
@@ -41,7 +45,7 @@ export function SessionSidebar({ summary, errors, onTrainErrors }: Props) {
                 </li>
               ))}
             </ul>
-            <button type="button" onClick={onTrainErrors}>
+            <button type="button" disabled={busy} onClick={onTrainErrors}>
               Entrenar solo estas
             </button>
           </>

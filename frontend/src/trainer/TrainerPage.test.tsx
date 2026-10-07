@@ -172,4 +172,93 @@ describe('TrainerPage', () => {
       expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({ mode: 'frequent', card_ids: [3, 5] })
     })
   })
+  it('creates a single session on a double click of Empezar', async () => {
+    const fetchMock = mockApi(routes())
+    render(<TrainerPage />)
+    const button = await screen.findByRole('button', { name: 'Empezar' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    await screen.findByText('Foldean hasta vos', { exact: false })
+    const created = fetchMock.mock.calls.filter(
+      ([url, init]) => String(url) === '/api/trainer/sessions' && init?.method === 'POST',
+    )
+    expect(created).toHaveLength(1)
+  })
+
+  it('discards an answer that resolves after a new session started', async () => {
+    const fetchMock = mockApi(routes())
+    const base = fetchMock.getMockImplementation() as (u: RequestInfo | URL, i?: RequestInit) => Promise<Response>
+    let release: () => void = () => {}
+    const gate = new Promise<void>((r) => {
+      release = r
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (u: RequestInfo | URL, i?: RequestInit) => {
+        if (String(u).includes('/answer')) await gate
+        return base(u, i)
+      }),
+    )
+    await start()
+    await user.keyboard('f')
+    await user.click(screen.getByRole('button', { name: 'Empezar' }))
+    await waitFor(() => expect(screen.queryByText('Preparando spot…')).not.toBeInTheDocument())
+    await act(async () => {
+      release()
+      await gate
+    })
+    await act(async () => {})
+    expect(screen.queryByText('Error', { selector: '.verdict' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Fold/ })).toBeInTheDocument()
+  })
+
+  it('ignores shortcuts while typing in a field', async () => {
+    const fetchMock = mockApi(routes())
+    await start()
+    await user.click(screen.getByRole('button', { name: 'Mostrar' }))
+    fireEvent.keyDown(screen.getByRole('combobox', { name: /Modo/ }), { key: 'f' })
+    await act(async () => {})
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/answer'))).toBe(false)
+  })
+
+  it('shows the server message when the session cannot be created', async () => {
+    mockApi(
+      routes({
+        'POST /api/trainer/sessions': () => ({ status: 422, json: { detail: 'Elegí al menos una fuente' } }),
+      }),
+    )
+    render(<TrainerPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Empezar' }))
+    expect(await screen.findByText('Elegí al menos una fuente')).toBeInTheDocument()
+  })
+
+  it('clears the old spot when a new session fails to start', async () => {
+    let fail = false
+    mockApi(
+      routes({
+        'POST /api/trainer/sessions': () =>
+          fail
+            ? { status: 422, json: { detail: 'Elegí al menos una fuente' } }
+            : { status: 201, json: { id: 1, filters: {} } },
+      }),
+    )
+    await start()
+    fail = true
+    await user.click(screen.getByRole('button', { name: 'Empezar' }))
+    await screen.findByText('Elegí al menos una fuente')
+    expect(screen.queryByRole('button', { name: /Fold/ })).not.toBeInTheDocument()
+  })
+
+  it('reports a failure loading sources and does not enable them', async () => {
+    mockApi(routes({ 'GET /api/trainer/sources': () => ({ status: 500, json: { detail: 'boom' } }) }))
+    render(<TrainerPage />)
+    expect(await screen.findByText(/No se pudieron cargar las fuentes/)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Tablas/ })).toBeDisabled()
+  })
+
+  it('reports a failure loading payouts', async () => {
+    mockApi(routes({ 'GET /api/trainer/payouts': () => ({ status: 500, json: { detail: 'boom' } }) }))
+    render(<TrainerPage />)
+    expect(await screen.findByText(/No se pudieron cargar las estructuras de premios/)).toBeInTheDocument()
+  })
 })
