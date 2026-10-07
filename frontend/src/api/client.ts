@@ -1,6 +1,7 @@
 export interface VersionInfo {
   app: string
   core: string
+  packaged?: boolean
 }
 
 export class ApiError extends Error {

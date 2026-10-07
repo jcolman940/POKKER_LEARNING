@@ -1,5 +1,6 @@
 import { deleteJson, getJson, postJson } from '../api/client'
 import type {
+  InstallStatus,
   LibraryFamily,
   PrefillResponse,
   SolverJob,
@@ -10,6 +11,8 @@ import type {
 const BASE = '/api/solver'
 
 export const fetchSolverStatus = () => getJson<SolverStatus>(`${BASE}/status`)
+export const startInstall = () => postJson<InstallStatus>(`${BASE}/install`, {})
+export const fetchInstall = () => getJson<InstallStatus>(`${BASE}/install`)
 export const fetchJobs = () => getJson<SolverJob[]>(`${BASE}/jobs`)
 export const fetchJob = (id: number) => getJson<SolverJob>(`${BASE}/jobs/${id}`)
 export const cancelJob = (id: number) => postJson<SolverJob>(`${BASE}/jobs/${id}/cancel`, {})

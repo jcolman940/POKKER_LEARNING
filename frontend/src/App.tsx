@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchVersion, type VersionInfo } from './api/client'
+import { startHeartbeat } from './app/heartbeat'
 import { HistoryPage } from './history/HistoryPage'
 import { ReplayerView } from './history/ReplayerView'
 import { PushFoldPage } from './pushfold/PushFoldPage'
@@ -48,6 +49,9 @@ export default function App() {
       })
     return () => controller.abort()
   }, [])
+
+  const packaged = backend.state === 'ok' && backend.info.packaged === true
+  useEffect(() => (packaged ? startHeartbeat() : undefined), [packaged])
 
   return (
     <div className="app">

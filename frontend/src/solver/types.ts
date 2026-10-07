@@ -42,6 +42,13 @@ export interface SolverStatus {
   presets: { name: string; label: string }[]
 }
 
+export interface InstallStatus {
+  state: 'idle' | 'downloading' | 'verifying' | 'extracting' | 'done' | 'error'
+  bytes: number
+  total: number | null
+  error: string | null
+}
+
 export interface PrefillRange {
   text: string | null
   approximate: boolean
