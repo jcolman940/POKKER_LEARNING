@@ -12,6 +12,7 @@ const TABS = [
 
 export function SolverPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('queue')
+  const [libraryVersion, setLibraryVersion] = useState(0)
   const [viewing, setViewing] = useState<{ hash: string; title: string } | null>(null)
   return (
     <div className="solver-page">
@@ -30,9 +31,24 @@ export function SolverPage() {
         ))}
       </div>
       {tab === 'queue' && <QueuePanel />}
-      {tab === 'library' && <LibraryPanel onOpen={(hash, title) => setViewing({ hash, title })} />}
+      {tab === 'library' && (
+        <LibraryPanel
+          key={libraryVersion}
+          onOpen={(hash, title) => setViewing({ hash, title })}
+        />
+      )}
       {tab === 'settings' && <SettingsPanel />}
-      {viewing && <StrategyViewer key={viewing.hash} hash={viewing.hash} title={viewing.title} />}
+      {viewing && (
+        <StrategyViewer
+          key={viewing.hash}
+          hash={viewing.hash}
+          title={viewing.title}
+          onDeleted={() => {
+            setViewing(null)
+            setLibraryVersion((v) => v + 1)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/fetchMock'
+import { RangeMatrix } from '../ranges/RangeMatrix'
 import { PendingSolve } from './PendingSolve'
 import { PostflopSolverFields } from './PostflopSolverFields'
 import { RecommendationPanel } from './RecommendationPanel'
@@ -107,5 +108,60 @@ describe('solver recommendation', () => {
     expect(prefill).toHaveBeenCalled()
     expect(screen.getByText(/Stack del rango/)).toBeInTheDocument()
     expect(screen.getByText('Aproximado')).toBeInTheDocument()
+  })
+})
+
+describe('pending solve details', () => {
+  const pending = { id: 7, status: 'queued', iteration: 0, exploitability: null, position: 1 }
+
+  it('tells the user the queue is paused and keeps polling', async () => {
+    const api = mockApi({
+      'GET /api/solver/jobs/7': () => ({
+        json: { ...pending, paused: true, started_at: null },
+      }),
+    })
+    render(<PendingSolve job={{ ...pending, paused: true }} onDone={() => {}} intervalMs={10} />)
+    expect(screen.getByText('La cola está pausada: reanudala en Solver → Cola.')).toBeInTheDocument()
+    await waitFor(() => expect(api.mock.calls.length).toBeGreaterThan(2))
+  })
+
+  it('hides the paused message when the queue is not paused', () => {
+    render(<PendingSolve job={{ ...pending, paused: false }} onDone={() => {}} intervalMs={10000} />)
+    expect(screen.queryByText(/La cola está pausada/)).not.toBeInTheDocument()
+  })
+
+  it('shows elapsed seconds for a running job', () => {
+    const started = new Date(Date.now() - 42_000).toISOString()
+    render(
+      <PendingSolve
+        job={{ ...pending, status: 'running', iteration: 5, started_at: started }}
+        onDone={() => {}}
+        intervalMs={10000}
+      />,
+    )
+    expect(screen.getByText(/· 4[2-5] s/)).toBeInTheDocument()
+  })
+})
+
+describe('RangeMatrix implicit fold', () => {
+  const layers = [{ action: 'check', grid: Array(169).fill(0.4) }]
+
+  it('adds a phantom Fold share by default', () => {
+    render(<RangeMatrix layers={layers} />)
+    expect(screen.getAllByTitle(/Fold 60%/).length).toBeGreaterThan(0)
+  })
+
+  it('omits it when implicitFold is false', () => {
+    render(<RangeMatrix layers={layers} implicitFold={false} />)
+    expect(screen.queryAllByTitle(/Fold/)).toHaveLength(0)
+  })
+
+  it('is disabled in the solver strategy grid', () => {
+    render(
+      <RecommendationPanel
+        rec={{ ...baseRec, strategy_grid: [{ action: 'check', label: 'Check', grid: Array(169).fill(0.4) }] }}
+      />,
+    )
+    expect(screen.queryAllByTitle(/Fold/)).toHaveLength(0)
   })
 })

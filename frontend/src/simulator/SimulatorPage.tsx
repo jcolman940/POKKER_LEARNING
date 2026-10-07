@@ -80,7 +80,7 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
   const [heroRange, setHeroRange] = useState(initial?.hero_range ?? '')
   const [rangesApprox, setRangesApprox] = useState(initial?.ranges_approximate ?? false)
   const [prefillNotes, setPrefillNotes] = useState<string[]>([])
-  const [preset, setPreset] = useState(initial?.solver_preset ?? 'simple')
+  const [preset, setPreset] = useState(initial?.solver_preset ?? 'chico')
   const [presets, setPresets] = useState<{ name: string; label: string }[]>([])
   const [potType, setPotType] = useState<'srp' | '3bet'>('srp')
   const [aggressor, setAggressor] = useState<'hero' | 'villain'>('villain')
@@ -88,7 +88,7 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
   useEffect(() => {
     fetchSolverStatus()
       .then((s) => setPresets(s.presets))
-      .catch(() => setPresets([{ name: 'simple', label: 'Simple' }]))
+      .catch(() => setPresets([{ name: 'chico', label: 'Chico' }]))
   }, [])
 
   useEffect(() => {

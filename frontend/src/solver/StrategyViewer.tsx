@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 import { RangeMatrix } from '../ranges/RangeMatrix'
-import { fetchNode } from './api'
+import { deleteCached, fetchNode } from './api'
 import type { SolverNode } from './types'
 
-export function StrategyViewer({ hash, title }: { hash: string; title: string }) {
+interface Props {
+  hash: string
+  title: string
+  onDeleted?: () => void
+}
+
+export function StrategyViewer({ hash, title, onDeleted }: Props) {
   const [path, setPath] = useState<{ index: number; label: string }[]>([])
   const [loaded, setLoaded] = useState<{ key: string; node: SolverNode } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -28,9 +34,21 @@ export function StrategyViewer({ hash, title }: { hash: string; title: string })
     }
   }, [hash, key])
 
+  function remove() {
+    if (!window.confirm('¿Borrar este resultado de la caché?')) return
+    deleteCached(hash)
+      .then(() => onDeleted?.())
+      .catch((e: unknown) => setError(String(e)))
+  }
+
   return (
     <section className="panel" aria-labelledby="viewer-title">
-      <h3 id="viewer-title">{title}</h3>
+      <h3 id="viewer-title">
+        {title}{' '}
+        <button type="button" onClick={remove}>
+          Borrar de la caché
+        </button>
+      </h3>
       <nav aria-label="Camino en el árbol" className="small">
         <button type="button" onClick={() => setPath([])}>
           Raíz
@@ -66,6 +84,7 @@ export function StrategyViewer({ hash, title }: { hash: string; title: string })
           <RangeMatrix
             layers={node.layers.map((l) => ({ action: l.action, grid: l.grid }))}
             caption="Estrategia del rango en este nodo"
+            implicitFold={false}
           />
           <p className="small muted">
             Mezcla sobre el rango inicial del jugador (sin ponderar por la línea jugada).

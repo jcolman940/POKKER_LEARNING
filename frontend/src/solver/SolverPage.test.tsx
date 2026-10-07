@@ -11,13 +11,13 @@ afterEach(() => {
 })
 
 const status = {
-  configured: true, path: 'C:/ts/console_solver.exe', threads: 6, paused: false,
+  configured: true, path: 'C:/ts/console_solver.exe', threads: 6, paused: false, version: 'texassolver-0.2.0',
   cache_entries: 3, cache_bytes: 120000, presets: [{ name: 'simple', label: 'Simple' }],
 }
 const job = {
   id: 1, label: 'River Qs Jh 2h 7c 3d · pote 20bb', origin: 'batch', priority: 10,
   status: 'running', iteration: 40, exploitability: 2.5, error: null, position: null,
-  spot_hash: 'h', created_at: '2026-10-06T00:00:00Z', started_at: null, finished_at: null,
+  spot_hash: 'h', created_at: '2026-10-06T00:00:00Z', started_at: null, paused: false, finished_at: null,
 }
 const library = [{
   id: 'cash', label: 'Cash 6-max 100bb', preset: 'simple',
@@ -147,5 +147,57 @@ describe('SolverPage', () => {
     const before = api.mock.calls.length
     await vi.advanceTimersByTimeAsync(10000)
     expect(api.mock.calls.length).toBe(before)
+  })
+
+  it('shows the solver version in settings', async () => {
+    routes()
+    render(<SolverPage />)
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuración' }))
+    expect(await screen.findByText(/texassolver-0.2.0/)).toBeInTheDocument()
+  })
+
+  it('enqueues a custom batch and reports missing charts', async () => {
+    const api = routes({
+      'POST /api/solver/batch': () => ({ json: { enqueued: 3, missing: ['falta tabla: BTN RFI'] } }),
+    })
+    render(<SolverPage />)
+    fireEvent.click(await screen.findByRole('tab', { name: 'Biblioteca' }))
+    fireEvent.change(await screen.findByLabelText('Agresor'), { target: { value: 'BTN' } })
+    fireEvent.change(screen.getByLabelText('Caller'), { target: { value: 'BB' } })
+    fireEvent.change(screen.getByLabelText('Stack (bb)'), { target: { value: '100' } })
+    fireEvent.change(screen.getByLabelText('Open (bb)'), { target: { value: '2.5' } })
+    fireEvent.change(screen.getByLabelText('Flops (opcional)'), { target: { value: 'AhKd2c\n7s7h2d' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Encolar lote' }))
+    expect(await screen.findByText(/Encolados: 3/)).toBeInTheDocument()
+    expect(screen.getByText(/falta tabla: BTN RFI/)).toBeInTheDocument()
+    const call = api.mock.calls.find(([u]) => String(u) === '/api/solver/batch')
+    const init = call?.[1] as RequestInit
+    const body = JSON.parse(init.body as string)
+    expect(body).toMatchObject({
+      game_format: 'cash',
+      preset: 'chico',
+      line: { aggressor: 'BTN', caller: 'BB', pot_type: 'srp', stack_bb: 100, open_size_bb: 2.5 },
+      flops: ['AhKd2c', '7s7h2d'],
+    })
+  })
+
+  it('deletes a cached result only when confirmed and closes the viewer', async () => {
+    const api = routes({ 'DELETE /api/solver/cache/abc': () => ({ json: null }) })
+    const confirm = vi.spyOn(window, 'confirm')
+    render(<SolverPage />)
+    fireEvent.click(await screen.findByRole('tab', { name: 'Biblioteca' }))
+    fireEvent.click(await screen.findByRole('button', { name: /AsKh2d/ }))
+    const del = await screen.findByRole('button', { name: 'Borrar de la caché' })
+    confirm.mockReturnValue(false)
+    fireEvent.click(del)
+    expect(api).not.toHaveBeenCalledWith('/api/solver/cache/abc', expect.anything())
+    confirm.mockReturnValue(true)
+    fireEvent.click(del)
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith('/api/solver/cache/abc', expect.objectContaining({ method: 'DELETE' })),
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Borrar de la caché' })).not.toBeInTheDocument(),
+    )
   })
 })

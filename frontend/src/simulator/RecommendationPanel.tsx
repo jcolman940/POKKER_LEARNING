@@ -54,6 +54,7 @@ export function RecommendationPanel({ rec }: { rec: Recommendation }) {
         <RangeMatrix
           layers={rec.strategy_grid.map((l) => ({ action: l.action, grid: l.grid }))}
           caption="Estrategia del rango de Hero en este nodo"
+          implicitFold={false}
         />
       )}
       {rec.reference && <p className="small muted">{rec.reference}</p>}

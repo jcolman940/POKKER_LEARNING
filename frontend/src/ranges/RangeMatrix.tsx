@@ -13,6 +13,8 @@ interface Props {
   /** Extra text for each cell's tooltip (e.g. EV). */
   detail?: (index: number) => string | null
   caption?: string
+  /** Show the unassigned remainder of a cell as "Fold" in tooltips (preflop charts). */
+  implicitFold?: boolean
 }
 
 const CELLS = Array.from({ length: 169 }, (_, i) => i)
@@ -32,16 +34,16 @@ function background(layers: Layer[], i: number): string {
   return `linear-gradient(to right, ${stops.join(', ')})`
 }
 
-function describe(layers: Layer[], i: number): string {
+function describe(layers: Layer[], i: number, implicitFold: boolean): string {
   const parts = layers
     .filter(({ grid }) => (grid[i] ?? 0) > 0)
     .map(({ action, grid }) => `${ACTION_LABEL[action] ?? action} ${Math.round(grid[i] * 100)}%`)
   const total = layers.reduce((s, { grid }) => s + (grid[i] ?? 0), 0)
-  if (total < 0.999) parts.push(`Fold ${Math.round((1 - total) * 100)}%`)
+  if (implicitFold && total < 0.999) parts.push(`Fold ${Math.round((1 - total) * 100)}%`)
   return `${handClassName(i)}: ${parts.join(', ')}`
 }
 
-export function RangeMatrix({ layers, onPaint, detail, caption }: Props) {
+export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = true }: Props) {
   const painting = useRef(false)
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export function RangeMatrix({ layers, onPaint, detail, caption }: Props) {
     <div className="matrix" role="group" aria-label={caption ?? 'Matriz de rango 13×13'}>
       {CELLS.map((i) => {
         const extra = detail?.(i)
-        const label = describe(layers, i) + (extra ? ` · ${extra}` : '')
+        const label = describe(layers, i, implicitFold) + (extra ? ` · ${extra}` : '')
         const style = { background: background(layers, i) }
         const filled = layers.reduce((sum, { grid }) => sum + (grid[i] ?? 0), 0) >= 0.5
         const className = filled ? 'matrix-cell matrix-cell-on' : 'matrix-cell'

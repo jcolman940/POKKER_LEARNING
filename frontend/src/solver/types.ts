@@ -4,6 +4,8 @@ export interface PendingJob {
   iteration: number
   exploitability: number | null
   position: number | null
+  paused?: boolean
+  started_at?: string | null
 }
 
 export interface StrategyLayer {
@@ -22,6 +24,7 @@ export interface SolverJob {
   exploitability: number | null
   error: string | null
   position: number | null
+  paused: boolean
   spot_hash: string
   created_at: string
   started_at: string | null
@@ -30,6 +33,7 @@ export interface SolverJob {
 
 export interface SolverStatus {
   configured: boolean
+  version: string
   path: string | null
   threads: number
   paused: boolean

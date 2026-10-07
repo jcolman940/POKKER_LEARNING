@@ -20,6 +20,24 @@ export const clearCache = () => deleteJson(`${BASE}/cache`)
 export const fetchLibrary = () => getJson<LibraryFamily[]>(`${BASE}/library`)
 export const enqueueLibrary = (family: string, line: string | null) =>
   postJson<{ enqueued: number; missing: string[] }>(`${BASE}/library/enqueue`, { family, line })
+export interface BatchRequest {
+  game_format: string
+  players: number
+  ante_total_bb: number
+  preset: string
+  line: {
+    aggressor: string
+    caller: string
+    pot_type: 'srp' | '3bet'
+    stack_bb: number
+    open_size_bb: number
+    threebet_size_bb?: number
+  }
+  flops: string[] | null
+}
+export const enqueueBatch = (body: BatchRequest) =>
+  postJson<{ enqueued: number; missing: string[] }>(`${BASE}/batch`, body)
+export const deleteCached = (hash: string) => deleteJson(`${BASE}/cache/${hash}`)
 export const fetchNode = (hash: string, path: string) =>
   getJson<SolverNode>(`${BASE}/results/${hash}/node?path=${encodeURIComponent(path)}`)
 

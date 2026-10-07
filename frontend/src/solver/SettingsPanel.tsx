@@ -46,6 +46,7 @@ export function SettingsPanel() {
           ? `Solver: ${status.path}`
           : 'Solver no configurado: definí POKER_SOLVER_PATH con la ruta de console_solver.exe.'}
       </p>
+      <p>Versión del solver: {status.version}</p>
       <p>Hilos: {status.threads}</p>
       <p>
         Caché: {status.cache_entries} resultados · {(status.cache_bytes / 1024 / 1024).toFixed(1)} MB{' '}
