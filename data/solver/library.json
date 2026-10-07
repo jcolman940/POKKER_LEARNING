@@ -1,0 +1,35 @@
+{
+  "families": [
+    {
+      "id": "mtt",
+      "label": "MTT",
+      "game_format": "mtt",
+      "players": 9,
+      "ante_total_bb": 1.0,
+      "preset": "simple",
+      "lines": [
+        {"id": "btn_bb_25", "label": "BTN vs BB · SRP · 25bb", "aggressor": "BTN", "caller": "BB", "pot_type": "srp", "stack_bb": 25, "open_size_bb": 2.0},
+        {"id": "co_bb_25", "label": "CO vs BB · SRP · 25bb", "aggressor": "CO", "caller": "BB", "pot_type": "srp", "stack_bb": 25, "open_size_bb": 2.0},
+        {"id": "sb_bb_25", "label": "SB vs BB · SRP · 25bb", "aggressor": "SB", "caller": "BB", "pot_type": "srp", "stack_bb": 25, "open_size_bb": 2.5},
+        {"id": "btn_bb_40", "label": "BTN vs BB · SRP · 40bb", "aggressor": "BTN", "caller": "BB", "pot_type": "srp", "stack_bb": 40, "open_size_bb": 2.2},
+        {"id": "co_bb_40", "label": "CO vs BB · SRP · 40bb", "aggressor": "CO", "caller": "BB", "pot_type": "srp", "stack_bb": 40, "open_size_bb": 2.2},
+        {"id": "sb_bb_40", "label": "SB vs BB · SRP · 40bb", "aggressor": "SB", "caller": "BB", "pot_type": "srp", "stack_bb": 40, "open_size_bb": 2.5},
+        {"id": "bb_btn_3b_40", "label": "BB vs BTN · 3-bet pot · 40bb", "aggressor": "BB", "caller": "BTN", "pot_type": "3bet", "stack_bb": 40, "open_size_bb": 2.2, "threebet_size_bb": 9.0}
+      ]
+    },
+    {
+      "id": "cash",
+      "label": "Cash 6-max 100bb",
+      "game_format": "cash",
+      "players": 6,
+      "ante_total_bb": 0.0,
+      "preset": "simple",
+      "lines": [
+        {"id": "btn_bb", "label": "BTN vs BB · SRP", "aggressor": "BTN", "caller": "BB", "pot_type": "srp", "stack_bb": 100, "open_size_bb": 2.5},
+        {"id": "co_bb", "label": "CO vs BB · SRP", "aggressor": "CO", "caller": "BB", "pot_type": "srp", "stack_bb": 100, "open_size_bb": 2.5},
+        {"id": "sb_bb", "label": "SB vs BB · SRP", "aggressor": "SB", "caller": "BB", "pot_type": "srp", "stack_bb": 100, "open_size_bb": 3.0},
+        {"id": "sb_btn_3b", "label": "SB vs BTN · 3-bet pot", "aggressor": "SB", "caller": "BTN", "pot_type": "3bet", "stack_bb": 100, "open_size_bb": 2.5, "threebet_size_bb": 11.0}
+      ]
+    }
+  ]
+}
