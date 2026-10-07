@@ -3,6 +3,12 @@
 All 22,100 flops are reduced to suit-isomorphic classes (weighted by how many real
 flops they stand for), grouped by texture, and picked round-robin from the most
 frequent textures so the subset reflects how often each texture comes up.
+
+Texture = (high-card bucket A/K/Q/J/T/9-7/6-, suit pattern, shape). Inside a group the
+members are sorted by rank tuple and picked spread out from the middle: the median
+first, then the ~25% and ~75% members, then ~12.5%, ~62.5%, ... (a deterministic
+bisection), so boards do not cluster on the lowest cards. Monotone groups get a x3 weight
+boost when ordering groups, otherwise their rarity would leave them out of 25 picks.
 """
 
 from __future__ import annotations
@@ -30,7 +36,7 @@ def _texture(flop: str) -> tuple[str, str, str]:
     ranks = [flop[0], flop[2], flop[4]]
     suits = {flop[1], flop[3], flop[5]}
     hi = RANKS.index(ranks[0])
-    high = "A" if hi == 12 else "K-Q" if hi >= 10 else "J-T" if hi >= 8 else "9-"
+    high = "AKQJT"[12 - hi] if hi >= 8 else "9-7" if hi >= 5 else "6-"
     suit = {1: "mono", 2: "two-tone", 3: "rainbow"}[len(suits)]
     idx = sorted({RANKS.index(r) for r in ranks})
     if len(idx) < 3:
@@ -50,21 +56,54 @@ def _classes() -> dict[str, int]:
     return dict(weights)
 
 
+def _spread_indices(m: int) -> list[int]:
+    """All indices 0..m-1, median first, then bisection fractions 1/4, 3/4, 1/8, 5/8, ..."""
+    order: list[int] = []
+    seen: set[int] = set()
+    fractions = [0.5]
+    denom = 4
+    while len(fractions) < 2 * m + 2:
+        fractions += [k / denom for k in range(1, denom, 2) if k / denom != 0.5]
+        denom *= 2
+    for f in fractions:
+        i = min(int(f * m), m - 1)
+        if i not in seen:
+            seen.add(i)
+            order.append(i)
+    order += [i for i in range(m) if i not in seen]
+    return order
+
+
 def representative_flops(n: int = 25) -> list[str]:
     groups: dict[tuple[str, str, str], list[tuple[int, str]]] = defaultdict(list)
     for flop, weight in _classes().items():
         groups[_texture(flop)].append((weight, flop))
-    for members in groups.values():
-        members.sort(key=lambda x: (-x[0], x[1]))
-    order = sorted(groups, key=lambda k: (-sum(w for w, _ in groups[k]), k))
+    spread: dict[tuple[str, str, str], list[str]] = {}
+    for key, members in groups.items():
+        by_rank = sorted(
+            (f for _, f in members),
+            key=lambda f: ([RANKS.index(f[i]) for i in (0, 2, 4)], f),
+        )
+        spread[key] = [by_rank[i] for i in _spread_indices(len(by_rank))]
+    # Monotone boards are rare (~5%) but study-relevant: boost them so they make the cut.
+    boost = {"mono": 3}
+    order = sorted(groups, key=lambda k: (-sum(w for w, _ in groups[k]) * boost.get(k[1], 1), k))
     picked: list[str] = []
+    used: dict[str, int] = {}
     depth = 0
     while len(picked) < n:
         added = False
         for key in order:
-            if depth < len(groups[key]) and len(picked) < n:
-                picked.append(groups[key][depth][1])
+            if depth < len(spread[key]) and len(picked) < n:
                 added = True
+                flop = spread[key][depth]
+                low = flop[2] + flop[4]  # two lowest ranks
+                mid = "mid" + flop[2]
+                # keep boards from clustering on the same low cards / middle rank
+                if used.get(low, 0) < 3 and used.get(mid, 0) < 3:
+                    used[low] = used.get(low, 0) + 1
+                    used[mid] = used.get(mid, 0) + 1
+                    picked.append(flop)
         if not added:
             break
         depth += 1
