@@ -29,3 +29,4 @@ frontend/dist/
 
 # Local app data
 var/
+launcher/out/
