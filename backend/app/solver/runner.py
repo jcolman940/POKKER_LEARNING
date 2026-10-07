@@ -72,6 +72,8 @@ def _read_progress(log: Path, last: Progress) -> Progress:
             entry = json.loads(line)
         except ValueError:
             continue  # partially written line
+        if not isinstance(entry, dict):
+            continue
         return Progress(
             iteration=int(entry.get("iteration", 0)),
             exploitability=entry.get("exploitibility"),
@@ -115,11 +117,11 @@ def run_solver(
             stderr=subprocess.STDOUT,
             **kwargs,
         )
-        if on_start:
-            on_start(proc.pid)
         progress = Progress()
         started = time.monotonic()
         try:
+            if on_start:
+                on_start(proc.pid)
             while proc.poll() is None:
                 time.sleep(poll_s)
                 current = _read_progress(workdir / LOG_FILE, progress)
@@ -127,13 +129,19 @@ def run_solver(
                     progress = current
                     if on_progress:
                         on_progress(progress)
+                if proc.poll() is not None:
+                    break  # finished during the last sleep: not a timeout/stop
                 if should_stop and (reason := should_stop()):
                     raise SolverStopped(reason)
                 if time.monotonic() - started > timeout_s:
                     raise SolverError(f"timeout: el solve superó {timeout_s / 60:g} min")
         except BaseException:
-            kill_tree(proc.pid)
-            proc.wait()
+            try:
+                kill_tree(proc.pid)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                proc.wait(timeout=30)
             raise
 
     progress = _read_progress(workdir / LOG_FILE, progress)

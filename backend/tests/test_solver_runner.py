@@ -1,3 +1,5 @@
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -7,6 +9,21 @@ from app.solver.runner import Progress, SolverError, SolverStopped, run_solver, 
 FIXTURES = Path(__file__).parent / "fixtures" / "solver"
 FAKE = Path(__file__).parent / "fake_solver.py"
 COMMANDS = "set_pot 2000\ndump_result result.json\n"
+
+
+def pid_alive(pid: int) -> bool:
+    if os.name == "nt":
+        out = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+        ).stdout
+        return f'"{pid}"' in out
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
 
 
 @pytest.fixture
@@ -67,14 +84,37 @@ def test_garbage_output(tmp_path, fake):
 
 def test_timeout_kills_the_process(tmp_path, fake):
     fake("hang")
+    pids: list[int] = []
     with pytest.raises(SolverError, match="timeout"):
-        run_solver(COMMANDS, tmp_path, FAKE, timeout_s=0.5, poll_s=0.05)
+        run_solver(COMMANDS, tmp_path, FAKE, timeout_s=0.5, poll_s=0.05, on_start=pids.append)
+    assert pids and not pid_alive(pids[0])
 
 
 def test_should_stop(tmp_path, fake):
     fake("hang")
+    pids: list[int] = []
     with pytest.raises(SolverStopped) as exc:
         run_solver(
-            COMMANDS, tmp_path, FAKE, timeout_s=30, poll_s=0.05, should_stop=lambda: "cancelled"
+            COMMANDS,
+            tmp_path,
+            FAKE,
+            timeout_s=30,
+            poll_s=0.05,
+            on_start=pids.append,
+            should_stop=lambda: "cancelled",
         )
     assert exc.value.reason == "cancelled"
+    assert pids and not pid_alive(pids[0])
+
+
+def test_on_start_failure_still_kills_the_solver(tmp_path, fake):
+    fake("hang")
+    pids: list[int] = []
+
+    def boom(pid: int) -> None:
+        pids.append(pid)
+        raise RuntimeError("on_start failed")
+
+    with pytest.raises(RuntimeError, match="on_start failed"):
+        run_solver(COMMANDS, tmp_path, FAKE, timeout_s=30, poll_s=0.05, on_start=boom)
+    assert pids and not pid_alive(pids[0])
