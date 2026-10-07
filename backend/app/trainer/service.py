@@ -26,7 +26,7 @@ from app.recommend.schemas import RecommendationOut
 from app.trainer.ranges import score_range
 from app.trainer.scoring import score_hand
 from app.trainer.selection import NoSpots, ServedSpot, aware, choose_spot
-from app.trainer.spots import _chart_usable
+from app.trainer.spots import chart_usable
 from app.trainer.srs import INITIAL_EASE, CardState, relearn_offset, schedule
 
 SOURCES = ("pushfold", "chart", "range")
@@ -52,7 +52,7 @@ def _now() -> datetime:
 
 def source_status(session: Session) -> dict[str, dict]:
     charts = list(session.scalars(select(PreflopChart)))
-    chart_ok = any(_chart_usable(c) is not None for c in charts)
+    chart_ok = any(chart_usable(c) is not None for c in charts)
     range_ok = any(any(any(v > 0 for v in f) for f in c.actions.values()) for c in charts)
     return {
         "pushfold": {"available": True, "reason": None},

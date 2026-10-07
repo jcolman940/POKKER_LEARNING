@@ -52,7 +52,7 @@ def pushfold_pool(table_size: int) -> list[list[float]]:
 # ---------------------------------------------------------------- hand choice
 
 
-def _combo(rng: random.Random, cls: str) -> str:
+def random_combo(rng: random.Random, cls: str) -> str:
     hi, lo = cls[0], cls[1]
     if len(cls) == 2:
         s1, s2 = rng.sample(SUITS, 2)
@@ -75,7 +75,7 @@ def pick_hand(
     use_frontier = front.sum() > 0 and rng.random() < difficulty / 100
     w = front if use_frontier else weights
     idx = rng.choices(range(169), weights=w.tolist())[0]
-    return _combo(rng, class_names()[idx])
+    return random_combo(rng, class_names()[idx])
 
 
 def _grid_pos(name: str) -> tuple[int, int]:
@@ -219,7 +219,7 @@ def generate_pushfold(
 # --------------------------------------------------------------------- charts
 
 
-def _chart_usable(chart: PreflopChart) -> Situation | None:
+def chart_usable(chart: PreflopChart) -> Situation | None:
     """The chart's situation when it can become a valid Scenario, else None."""
     try:
         situation = Situation(chart.situation)
@@ -260,7 +260,7 @@ def generate_chart(
     pushfold_max = get_settings().pushfold_max_bb
     charts: list[tuple[PreflopChart, Situation]] = []
     for chart in session.scalars(query):
-        situation = _chart_usable(chart)
+        situation = chart_usable(chart)
         if situation is None:
             continue
         if filters.get("stack_buckets"):

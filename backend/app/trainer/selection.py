@@ -13,16 +13,16 @@ from app.config import get_settings
 from app.db.models import PayoutStructure, PreflopChart, TrainerCard, TrainerSession
 from app.domain.scenario import TOURNAMENT_FORMATS, GameFormat, Scenario
 from app.leaks.finder import stack_bucket
-from app.recommend.engine import recommend
+from app.recommend.engine import recommend, recommend_from_chart
 from app.recommend.preflop_equity import hand_class
 from app.trainer.ranges import SITUATION_LABELS, generate_range_drill
 from app.trainer.spots import (
     TrainerSpot,
-    _chart_usable,
+    chart_usable,
     generate_chart,
     generate_pushfold,
+    random_combo,
 )
-from app.trainer.spots import _combo as random_combo
 from app.trainer.srs import pick_kind
 
 ATTEMPTS = 3
@@ -39,6 +39,10 @@ class ServedSpot:
     review: bool
     reference: dict  # server side only (recommendation or target grid)
     card_payload: dict  # what the card stores to regenerate the spot
+
+
+class CardGone(Exception):
+    """A card's chart no longer exists (or can no longer produce a spot)."""
 
 
 class NoSpots(Exception):
@@ -59,7 +63,13 @@ def _label(scenario: Scenario) -> str:
 def _hand_spot(
     session: Session, spot: TrainerSpot, card: TrainerCard | None, review: bool
 ) -> ServedSpot | None:
-    rec = recommend(spot.scenario, session)
+    chart = session.get(PreflopChart, spot.chart_id) if spot.chart_id else None
+    if spot.source == "chart":
+        if chart is None:
+            return None
+        rec = recommend_from_chart(chart, spot.scenario)  # the chart the spot came from
+    else:
+        rec = recommend(spot.scenario, session)
     if not rec.available or not rec.actions:
         return None
     title = _label(spot.scenario)
@@ -127,13 +137,17 @@ def _other_combo(rng: random.Random, hand: str) -> str:
 
 
 def spot_from_card(session: Session, rng: random.Random, card: TrainerCard) -> ServedSpot | None:
-    """Rebuild a reviewed card's spot (new combo of the same class); None if it is gone."""
+    """Rebuild a reviewed card's spot (new combo of the same class).
+
+    Raises CardGone when its chart is missing or unusable; returns None when the spot
+    just cannot be built right now (the card is kept).
+    """
     payload = card.scenario
     if card.source == "range":
         chart = session.get(PreflopChart, payload["chart_id"])
         action = payload["action"]
         if chart is None or not any(v > 0 for v in chart.actions.get(action, [])):
-            return None
+            raise CardGone
         return _range_spot(chart, action, payload["title"], card.key, card, True)
     scenario = Scenario(**payload["scenario"])
     scenario = scenario.model_copy(update={"hero_hand": _other_combo(rng, scenario.hero_hand)})
@@ -141,8 +155,8 @@ def spot_from_card(session: Session, rng: random.Random, card: TrainerCard) -> S
     chart_id = payload.get("chart_id")
     if card.source == "chart":
         chart = session.get(PreflopChart, chart_id) if chart_id else None
-        if chart is None or _chart_usable(chart) is None:
-            return None
+        if chart is None or chart_usable(chart) is None:
+            raise CardGone
         offered = _chart_offered(chart)
     spot = TrainerSpot(card.source, scenario, offered, card.key, chart_id)
     return _hand_spot(session, spot, card, True)
@@ -217,10 +231,13 @@ def _first_usable(
     session: Session, rng: random.Random, cards: list[TrainerCard]
 ) -> ServedSpot | None:
     for card in cards:
-        served = spot_from_card(session, rng, card)
+        try:
+            served = spot_from_card(session, rng, card)
+        except CardGone:
+            card.archived = True  # its chart is gone: retire it and try the next
+            continue
         if served is not None:
             return served
-        card.archived = True  # its chart is gone: retire it and try the next
     return None
 
 

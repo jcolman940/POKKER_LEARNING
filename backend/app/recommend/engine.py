@@ -9,12 +9,14 @@ Postflop: heads-up solver (TexasSolver, with cache and queue) or multiway heuris
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 
 import numpy as np
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.db.models import PreflopChart
 from app.domain.positions import preflop_order
 from app.domain.scenario import TOURNAMENT_FORMATS, Scenario, Situation, Street
 from app.recommend.charts import (
@@ -133,7 +135,17 @@ def _recommend_chart(scenario: Scenario, session: Session, hand: str) -> Recomme
             f"No hay rangos cargados para {scenario.hero_position} en esta situación. "
             "Cargalos en la sección Rangos preflop."
         )
-    chart = match.chart
+    return recommend_from_chart(match.chart, scenario, match.exact, match.mismatches)
+
+
+def recommend_from_chart(
+    chart: PreflopChart,
+    scenario: Scenario,
+    exact: bool = True,
+    mismatches: Sequence[str] = (),
+) -> RecommendationOut:
+    """The recommendation read from one specific chart (no chart lookup)."""
+    hand = scenario.hero_hand
     cls_name = hand_class(hand)
     cls = class_index()[cls_name]
     actions = [ActionOut(action=a, frequency=float(g[cls])) for a, g in chart.actions.items()]
@@ -141,13 +153,13 @@ def _recommend_chart(scenario: Scenario, session: Session, hand: str) -> Recomme
     actions = [a for a in actions if a.frequency > 0] + [ActionOut(action="fold", frequency=fold)]
     actions.sort(key=lambda a: -a.frequency)
 
-    warnings = list(match.mismatches)
-    if not match.exact:
+    warnings = list(mismatches)
+    if not exact:
         warnings.insert(0, "El escenario no coincide con las condiciones del rango: aproximado.")
     return RecommendationOut(
         available=True,
         source="chart",
-        confidence="exact" if match.exact else "approximate",
+        confidence="exact" if exact else "approximate",
         hand_class=cls_name,
         actions=[a for a in actions if a.frequency > 0],
         reference=f"{_upper_first(SOURCE_LABEL[ChartSource(chart.source)])} · {chart.name}",
