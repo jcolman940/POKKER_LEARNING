@@ -58,8 +58,20 @@ class Settings(BaseSettings):
     # Recommendation: tournaments at or below this effective stack use push/fold Nash.
     pushfold_max_bb: float = 15.0
 
-    # External postflop solver (TexasSolver console binary). Optional until phase 5.
+    # External postflop solver (TexasSolver console binary, AGPL: never vendored).
     solver_path: Path | None = None
+    solver_threads: int = Field(default_factory=lambda: os.cpu_count() or 4)
+    solver_timeout_min: float = 30.0
+    solver_trees_file: Path = REPO_ROOT / "data" / "solver" / "trees.json"
+    solver_library_file: Path = REPO_ROOT / "data" / "solver" / "library.json"
+
+    # Multiway postflop heuristic thresholds (own heuristics, not solver output).
+    heuristic_value_share: float = 0.65
+    heuristic_raise_share: float = 0.80
+    heuristic_semibluff_outs: int = 8
+    heuristic_realization_oop: float = 0.85
+    heuristic_realization_last: float = 0.95
+    heuristic_margin: float = 0.03
 
     # Update channel (phase 7): e.g. a GitHub Releases API URL.
     update_feed_url: str | None = None

@@ -1,0 +1,20 @@
+{
+  "simple": {
+    "label": "Simple",
+    "flop": {"bet": [33, 75], "raise": [60]},
+    "turn": {"bet": [50, 100], "raise": [60]},
+    "river": {"bet": [50, 100], "raise": [60]}
+  },
+  "chico": {
+    "label": "Chico (rápido)",
+    "flop": {"bet": [33], "raise": [60]},
+    "turn": {"bet": [66], "raise": [60]},
+    "river": {"bet": [75], "raise": [60]}
+  },
+  "amplio": {
+    "label": "Amplio (lento)",
+    "flop": {"bet": [25, 50, 100], "raise": [50, 100]},
+    "turn": {"bet": [33, 75, 125], "raise": [60]},
+    "river": {"bet": [33, 75, 125], "raise": [60]}
+  }
+}
