@@ -59,6 +59,8 @@ def build_solver_spot(scenario: Scenario) -> BuiltSpot:
 
     to_call = scenario.to_call_bb
     pot_before = scenario.pot_bb - to_call
+    if pot_before <= 0:
+        raise ValueError("El pote antes de la apuesta debe ser mayor que 0.")
     villain_side: Side = "ip" if hero == "oop" else "oop"
     facing = to_call > 0 and to_call < scenario.effective_stack_bb
     spot = SolverSpot(
@@ -87,12 +89,15 @@ def _explain(scenario: Scenario, node: StrategyNode, freqs: list[float]) -> list
     main = max(range(len(freqs)), key=freqs.__getitem__)
     if sorted(freqs)[-1] < 0.85:
         out.append("Estrategia mixta: alterná las acciones según sus frecuencias.")
-    share = showdown_share(
-        pokercore.hand_strength(scenario.hero_hand, scenario.villains[0].range, scenario.board)
+    strength = pokercore.hand_strength(
+        scenario.hero_hand, scenario.villains[0].range, scenario.board
     )
+    share = showdown_share(strength) if strength.combos > 0 else None
     kind = node.actions[main].kind
     if kind in AGGRESSIVE:
-        if share >= 0.6:
+        if share is None:
+            pass
+        elif share >= 0.6:
             out.append("Valor: tu mano le gana a la mayor parte del rango rival que paga.")
         else:
             out.append("Bluff/semi-bluff: poca equity al showdown, apuesta por fold equity.")
@@ -151,7 +156,10 @@ def recommend_solver(scenario: Scenario, session: Session) -> RecommendationOut:
         return _unavailable(str(e))
     cached = get_result(session, built.spot.spot_hash())
     if cached is not None:
-        return _from_cache(scenario, built, cached)
+        try:
+            return _from_cache(scenario, built, cached)
+        except ValueError as e:
+            return _unavailable(str(e))
     if not solver_available():
         return _unavailable(
             "El solver no está configurado: definí POKER_SOLVER_PATH con la ruta de "

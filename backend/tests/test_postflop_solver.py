@@ -6,7 +6,7 @@ import pytest
 from app.domain.scenario import Scenario, Villain
 from app.recommend.postflop_solver import build_solver_spot, hero_side, recommend_solver
 from app.solver.cache import store_result
-from app.solver.output_parser import parse_output
+from app.solver.output_parser import SolverAction, StrategyNode, parse_output
 from app.solver.runner import Progress
 
 FIXTURES = Path(__file__).parent / "fixtures" / "solver"
@@ -109,3 +109,50 @@ def test_approximate_when_ranges_flagged(db_session):
     cache_river(db_session)
     rec = recommend_solver(scenario(ranges_approximate=True), db_session)
     assert rec.confidence == "approximate"
+
+
+def test_pot_equal_to_call_is_rejected(db_session):
+    rec = recommend_solver(scenario(pot_bb=10.0, to_call_bb=10.0), db_session)
+    assert not rec.available
+    assert "pote antes de la apuesta" in rec.message
+
+
+def test_cached_tree_missing_node_is_unavailable(db_session):
+    ip = dict(hero_position="BTN", hero_hand="AhKd", villains=[Villain(position="BB", range=OOP)])
+    built = build_solver_spot(scenario(**ip, hero_range=IP))
+    tree = StrategyNode("oop", [SolverAction("check")], {"AhKd": [1.0]})
+    store_result(db_session, built.spot, tree, Progress(10, 1.0, 1), 1.0)
+    rec = recommend_solver(scenario(**ip, hero_range=IP), db_session)
+    assert not rec.available
+    assert "después del check" in rec.message
+
+
+def test_ip_hero_acts_after_check(db_session):
+    ip = dict(
+        hero_position="BTN",
+        hero_hand="AhKd",
+        hero_range=IP,
+        villains=[Villain(position="BB", range=OOP)],
+    )
+    built = build_solver_spot(scenario(**ip))
+    tree = parse_output(json.loads((FIXTURES / "river_out.json").read_text()), 90.0)
+    store_result(db_session, built.spot, tree, Progress(200, 0.42, 1), 18.0)
+    rec = recommend_solver(scenario(**ip), db_session)
+    assert rec.available
+    assert {a.action for a in rec.actions} <= {"check", "bet", "allin"}
+
+
+def test_oop_hero_facing_bet_after_check(db_session):
+    kw = dict(hero_hand="AhQh", pot_bb=30.0, to_call_bb=10.0)
+    built = build_solver_spot(scenario(**kw))
+    tree = parse_output(json.loads((FIXTURES / "river_out.json").read_text()), 90.0)
+    store_result(db_session, built.spot, tree, Progress(200, 0.42, 1), 18.0)
+    rec = recommend_solver(scenario(**kw), db_session)
+    assert rec.available
+    assert {a.action for a in rec.actions} <= {"fold", "call", "raise", "allin"}
+    assert {"fold", "call"} <= {a.action for a in rec.actions}
+
+
+def test_facing_all_in_has_no_bet_size():
+    built = build_solver_spot(scenario(pot_bb=100.0, to_call_bb=90.0))
+    assert built.spot.bettor is None and built.spot.facing_bet_pct is None
