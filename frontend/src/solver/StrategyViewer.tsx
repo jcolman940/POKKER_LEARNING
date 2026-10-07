@@ -5,24 +5,28 @@ import type { SolverNode } from './types'
 
 export function StrategyViewer({ hash, title }: { hash: string; title: string }) {
   const [path, setPath] = useState<{ index: number; label: string }[]>([])
-  const [node, setNode] = useState<SolverNode | null>(null)
+  const [loaded, setLoaded] = useState<{ key: string; node: SolverNode } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const key = path.map((p) => p.index).join('.')
+  const node = loaded?.node ?? null
+  const loading = loaded?.key !== key
 
   useEffect(() => {
     let stale = false
-    fetchNode(hash, path.map((p) => p.index).join('.'))
+    fetchNode(hash, key)
       .then((n) => {
         if (stale) return
-        setNode(n)
+        setLoaded({ key, node: n })
         setError(null)
       })
       .catch((e: unknown) => {
-        if (!stale) setError(String(e))
+        if (stale) return
+        setError(String(e))
       })
     return () => {
       stale = true
     }
-  }, [hash, path])
+  }, [hash, key])
 
   return (
     <section className="panel" aria-labelledby="viewer-title">
@@ -50,6 +54,7 @@ export function StrategyViewer({ hash, title }: { hash: string; title: string })
                 {a.has_child && (
                   <button
                     type="button"
+                    disabled={loading}
                     onClick={() => setPath([...path, { index: a.index, label: a.label }])}
                   >
                     Ver respuesta

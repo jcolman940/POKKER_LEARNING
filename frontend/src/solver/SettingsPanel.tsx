@@ -1,19 +1,46 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearCache, fetchSolverStatus } from './api'
 import type { SolverStatus } from './types'
 
 export function SettingsPanel() {
   const [status, setStatus] = useState<SolverStatus | null>(null)
-  const refresh = () => {
+  const [error, setError] = useState<string | null>(null)
+  const seq = useRef(0)
+
+  const refresh = useCallback(() => {
+    const mine = ++seq.current
     fetchSolverStatus()
-      .then(setStatus)
-      .catch(() => setStatus(null))
+      .then((s) => {
+        if (mine !== seq.current) return
+        setStatus(s)
+        setError(null)
+      })
+      .catch((e: unknown) => {
+        if (mine === seq.current) setError(String(e))
+      })
+  }, [])
+
+  useEffect(() => {
+    const counter = seq
+    refresh()
+    return () => {
+      counter.current++
+    }
+  }, [refresh])
+
+  function clear() {
+    clearCache()
+      .then(refresh)
+      .catch((e: unknown) => setError(String(e)))
   }
-  useEffect(refresh, [])
-  if (!status) return <p className="muted">Cargando…</p>
+
+  if (!status) {
+    return error ? <p className="error">{error}</p> : <p className="muted">Cargando…</p>
+  }
   return (
     <section className="panel" aria-labelledby="settings-title">
       <h3 id="settings-title">Configuración del solver</h3>
+      {error && <p className="error">{error}</p>}
       <p>
         {status.configured
           ? `Solver: ${status.path}`
@@ -25,7 +52,7 @@ export function SettingsPanel() {
         <button
           type="button"
           onClick={() => {
-            if (window.confirm('¿Vaciar toda la caché del solver?')) void clearCache().then(refresh)
+            if (window.confirm('¿Vaciar toda la caché del solver?')) clear()
           }}
         >
           Vaciar caché

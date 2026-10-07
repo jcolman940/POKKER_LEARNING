@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   cancelJob,
   fetchJobs,
@@ -23,20 +23,38 @@ export function QueuePanel() {
   const [paused, setPaused] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Request counter: only the latest request may update state, and none after unmount.
+  const seq = useRef(0)
+
   const refresh = useCallback(() => {
+    const mine = ++seq.current
     Promise.all([fetchJobs(), fetchSolverStatus()])
       .then(([j, s]) => {
+        if (mine !== seq.current) return
         setJobs(j)
         setPaused(s.paused)
+        setError(null)
       })
-      .catch((e: unknown) => setError(String(e)))
+      .catch((e: unknown) => {
+        if (mine === seq.current) setError(String(e))
+      })
   }, [])
 
   useEffect(() => {
+    const counter = seq
     refresh()
     const timer = setInterval(refresh, 2000)
-    return () => clearInterval(timer)
+    return () => {
+      clearInterval(timer)
+      counter.current++
+    }
   }, [refresh])
+
+  function run(action: () => Promise<unknown>) {
+    action()
+      .then(refresh)
+      .catch((e: unknown) => setError(String(e)))
+  }
 
   async function toggle() {
     try {
@@ -72,12 +90,12 @@ export function QueuePanel() {
             )}
             {j.error && <span className="error small">{j.error}</span>}
             {(j.status === 'queued' || j.status === 'running') && (
-              <button type="button" onClick={() => void cancelJob(j.id).then(refresh)}>
+              <button type="button" onClick={() => run(() => cancelJob(j.id))}>
                 Cancelar
               </button>
             )}
             {(j.status === 'failed' || j.status === 'cancelled') && (
-              <button type="button" onClick={() => void retryJob(j.id).then(refresh)}>
+              <button type="button" onClick={() => run(() => retryJob(j.id))}>
                 Reintentar
               </button>
             )}

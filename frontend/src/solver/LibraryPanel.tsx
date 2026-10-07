@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { enqueueLibrary, fetchLibrary } from './api'
 import type { LibraryEntry, LibraryFamily } from './types'
 
@@ -14,16 +14,36 @@ const ENTRY_LABEL: Record<LibraryEntry['status'], string> = {
 export function LibraryPanel({ onOpen }: { onOpen: (hash: string, title: string) => void }) {
   const [families, setFamilies] = useState<LibraryFamily[]>([])
   const [message, setMessage] = useState<string | null>(null)
-  const refresh = useCallback(() => {
-    fetchLibrary()
-      .then(setFamilies)
-      .catch((e: unknown) => setMessage(String(e)))
+  const seq = useRef(0)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
   }, [])
-  useEffect(refresh, [refresh])
+  const refresh = useCallback(() => {
+    const mine = ++seq.current
+    fetchLibrary()
+      .then((f) => {
+        if (mine === seq.current) setFamilies(f)
+      })
+      .catch((e: unknown) => {
+        if (mine === seq.current) setMessage(String(e))
+      })
+  }, [])
+  useEffect(() => {
+    const counter = seq
+    refresh()
+    return () => {
+      counter.current++
+    }
+  }, [refresh])
 
   async function enqueue(family: string, line: string | null) {
     try {
       const r = await enqueueLibrary(family, line)
+      if (!alive.current) return
       setMessage(
         r.missing.length > 0
           ? `Encolados: ${r.enqueued}. ${r.missing.join(' · ')}`
@@ -31,7 +51,7 @@ export function LibraryPanel({ onOpen }: { onOpen: (hash: string, title: string)
       )
       refresh()
     } catch (e: unknown) {
-      setMessage(String(e))
+      if (alive.current) setMessage(String(e))
     }
   }
 
