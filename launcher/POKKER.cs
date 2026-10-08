@@ -29,8 +29,9 @@
 //
 // Updates (spec 4): app\update.json "feed" -> GitHub releases/latest JSON; POKKER-X.Y.Z.zip and
 // .zip.sha256 are downloaded to <data>\updates, verified, unpacked into app.nuevo, the database
-// is copied to <data>\datos.anterior, then app -> app.viejo, new app -> app (and POKKER.exe ->
-// POKKER.exe.viejo + new copy when it differs). Any failure undoes every step (Rollback).
+// is copied to <data>\datos.anterior, then app -> app.viejo, new app -> app (and, when it differs,
+// the new launcher is copied to POKKER.exe.nuevo, then POKKER.exe -> POKKER.exe.viejo and
+// POKKER.exe.nuevo -> POKKER.exe). Any failure undoes every step (Rollback).
 // "Saltear esta version" is remembered in <data>\launcher.json {"skipped": "X.Y.Z"}.
 //
 // Hidden test-only options (not for users; used by manual checks and Task 8):
@@ -267,7 +268,9 @@ namespace Pokker
                 currentServer = server;
                 tray.ShowStarting();
                 string error = server.Start();
-                if (error == null) { error = server.WaitReady(60000, Application.DoEvents); }
+                // 60 s is plenty for a normal start; a server that is still alive after that is
+                // usually migrating a big database (decision backfill): keep waiting up to 10 min.
+                if (error == null) { error = server.WaitReady(60000, 600000, Application.DoEvents, tray.ShowMigrating); }
                 if (error != null)
                 {
                     Log.Write("El servidor no arranc\u00f3: " + error);
@@ -753,6 +756,16 @@ namespace Pokker
         {
             string oldExe = paths.ExePath + ".viejo";
             string oldApp = Path.Combine(paths.Root, "app.viejo");
+            string staleNewExe = paths.ExePath + ".nuevo";   // an update died before its renames
+            if (File.Exists(staleNewExe))
+            {
+                try
+                {
+                    File.Delete(staleNewExe);
+                    Log.Write("Borr\u00e9 un POKKER.exe.nuevo que qued\u00f3 de una actualizaci\u00f3n interrumpida");
+                }
+                catch (Exception e) { Log.Write("No pude borrar POKKER.exe.nuevo: " + e.Message); }
+            }
             if (!Directory.Exists(paths.AppDir) && Directory.Exists(oldApp))
             {
                 // An update died between "app -> app.viejo" and "new app -> app": app.viejo is the
@@ -1484,6 +1497,7 @@ namespace Pokker
         string NewDir { get { return Path.Combine(paths.Root, "app.nuevo"); } }
         string OldDir { get { return Path.Combine(paths.Root, "app.viejo"); } }
         string OldExe { get { return paths.ExePath + ".viejo"; } }
+        string NewExe { get { return paths.ExePath + ".nuevo"; } }
 
         public void Run(ProgressDialog ui)
         {
@@ -1503,6 +1517,7 @@ namespace Pokker
                     Fs.DeleteDir(OldDir);
                     Fs.DeleteDir(NewDir);
                     if (File.Exists(OldExe)) { File.Delete(OldExe); }
+                    if (File.Exists(NewExe)) { File.Delete(NewExe); }
                 }
                 catch (Exception e)
                 {
@@ -1584,10 +1599,14 @@ namespace Pokker
                 }
                 else
                 {
+                    // Copy first (the slow part, may fail) next to it, then two renames: POKKER.exe
+                    // is never missing for longer than a rename.
+                    rb.Add("borrar POKKER.exe.nuevo", delegate { Fs.DeleteFile(NewExe); });
+                    File.Copy(zipExe, NewExe, true);
                     Fs.Move(paths.ExePath, OldExe, false);
                     rb.Add("POKKER.exe.viejo -> POKKER.exe", delegate { Fs.Move(OldExe, paths.ExePath, false); });
-                    rb.Add("borrar el POKKER.exe nuevo", delegate { if (File.Exists(paths.ExePath)) { File.Delete(paths.ExePath); } });
-                    File.Copy(zipExe, paths.ExePath);
+                    Fs.Move(NewExe, paths.ExePath, false);
+                    rb.Add("POKKER.exe -> POKKER.exe.nuevo", delegate { Fs.Move(paths.ExePath, NewExe, false); });
                     newExe = true;
                     Log.Write("POKKER.exe nuevo copiado (el anterior qued\u00f3 como POKKER.exe.viejo)");
                 }
@@ -2042,14 +2061,24 @@ namespace Pokker
         }
 
         // Polls GET /api/version every 500 ms (2 s timeout per try) until it answers or timeoutMs
-        // passes. pump keeps the UI alive (balloon). null on success, otherwise the reason.
-        public string WaitReady(int timeoutMs, Action pump)
+        // passes; fails early only when the process exits. After slowMs with the process still
+        // alive, onSlow runs once (balloon: it is probably updating the data). pump keeps the UI
+        // alive. null on success, otherwise the reason.
+        public string WaitReady(int slowMs, int timeoutMs, Action pump, Action onSlow)
         {
             Stopwatch sw = Stopwatch.StartNew();
             bool loggedUnexpected = false;
+            bool slowNoticed = false;
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
                 if (HasExited) { return "el servidor se cerr\u00f3 al arrancar"; }
+                if (!slowNoticed && sw.ElapsedMilliseconds >= slowMs)
+                {
+                    slowNoticed = true;
+                    Log.Write("El servidor sigue vivo tras " + (slowMs / 1000) + " s sin responder: sigo esperando (hasta " +
+                              (timeoutMs / 60000) + " min)");
+                    if (onSlow != null) { onSlow(); }
+                }
                 try
                 {
                     int status;
@@ -2272,6 +2301,12 @@ namespace Pokker
         public void ShowStarting()
         {
             icon.ShowBalloonTip(5000, Program.Title, "Abriendo POKKER\u2026", ToolTipIcon.Info);
+        }
+
+        public void ShowMigrating()
+        {
+            Log.Write("Globito: Actualizando tus datos");
+            icon.ShowBalloonTip(15000, Program.Title, "Actualizando tus datos\u2026 puede tardar unos minutos", ToolTipIcon.Info);
         }
 
         public void Start(ServerProcess server, string updatedTo, int closeAfterSeconds, int checkAfterSeconds)
