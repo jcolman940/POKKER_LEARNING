@@ -12,6 +12,7 @@ import urllib.request
 import pytest
 from conftest import (
     AVAILABLE,
+    DIST,
     NEW_VERSION,
     SKIP_REASON,
     Install,
@@ -70,7 +71,7 @@ def test_update_without_asking_replaces_app_and_launcher(
 
     assert install.version() == NEW_VERSION
     assert sha256_upper(install.exe) == new_package.exe_sha
-    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo"):
+    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo", "POKKER.exe.nuevo"):
         assert not (install.root / leftover).exists(), leftover
     assert not list((install.data / "updates").glob("*")), "the download must be removed"
 
@@ -81,12 +82,52 @@ def test_update_without_asking_replaces_app_and_launcher(
             rows = db.execute("SELECT v FROM pokker_test_marker").fetchall()
         db.close()
         assert rows == [("antes de actualizar",)]
+        # The live database survived too: the new server migrated it in place.
+        with sqlite3.connect(install.data / "poker.sqlite3") as db:
+            live = db.execute("SELECT v FROM pokker_test_marker").fetchall()
+            tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master")}
+        db.close()
+        assert live == [("antes de actualizar",)]
+        assert "alembic_version" in tables
     else:
         assert not (install.data / "datos.anterior").exists()
 
     # Everything is down: no process from this copy, no running.json.
     assert not processes_under(install.base)
     assert not (install.data / "running.json").exists()
+
+
+def test_update_with_the_real_package_zip(install: Install, old_version: str) -> None:
+    """Feeds the launcher the dist\\POKKER-<ver>.zip written by package.ps1 (.NET ZipArchive)."""
+    zip_path = DIST.parent / f"POKKER-{old_version}.zip"
+    sha_path = DIST.parent / f"POKKER-{old_version}.zip.sha256"
+    if not zip_path.is_file() or not sha_path.is_file():
+        pytest.skip(f"{zip_path.name} (+ .sha256) not built: run scripts\\package.ps1")
+    (install.root / "app" / "VERSION").write_text("0.0.1\n", encoding="utf-8", newline="\n")
+    install.feed.publish(old_version, zip_path, sha_path.read_bytes())
+    install.make_database()
+
+    proc = install.start("--permitir-feed-local", "--actualizar-sin-preguntar", CLOSE_AFTER)
+    port = install.wait_for(install.running_port, 120, "running.json of the updated POKKER")
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/version", timeout=10) as r:
+        info = json.loads(r.read())
+    assert info["app"] == old_version
+    install.wait_all_exited(proc, 120)
+
+    log = install.log()
+    assert "SHA-256 verificado" in log
+    assert f"Actualización aplicada: 0.0.1 -> {old_version}" in log
+    assert "POKKER.exe no cambió" in log  # same launcher as dist: no relaunch
+    assert install.version() == old_version
+    for piece in PIECES:
+        assert (install.root / piece).is_file(), piece
+    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo", "POKKER.exe.nuevo"):
+        assert not (install.root / leftover).exists(), leftover
+    with sqlite3.connect(install.data / "poker.sqlite3") as db:
+        rows = db.execute("SELECT v FROM pokker_test_marker").fetchall()
+    db.close()
+    assert rows == [("antes de actualizar",)]
+    assert not processes_under(install.base)
 
 
 def test_bad_hash_rolls_back_completely(
@@ -107,7 +148,7 @@ def test_bad_hash_rolls_back_completely(
 
     assert install.version() == old_version
     assert sha256_upper(install.exe) == exe_before
-    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo"):
+    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo", "POKKER.exe.nuevo"):
         assert not (install.root / leftover).exists(), leftover
     assert not list((install.data / "updates").glob("*"))
     assert not (install.data / "datos.anterior").exists()
@@ -133,7 +174,7 @@ def test_package_without_version_rolls_back_after_unpacking(
 
     assert install.version() == old_version
     assert sha256_upper(install.exe) == exe_before
-    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo"):
+    for leftover in ("app.nuevo", "app.viejo", "POKKER.exe.viejo", "POKKER.exe.nuevo"):
         assert not (install.root / leftover).exists(), leftover
     assert not list((install.data / "updates").glob("*"))
     assert not (install.data / "datos.anterior").exists()

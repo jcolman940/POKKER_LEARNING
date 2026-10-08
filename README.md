@@ -49,7 +49,7 @@ Necesita Windows 10/11 (.NET Framework 4.x ya viene incluido) y un navegador pre
 
 **Actualizaciones.** Al abrir, POKKER busca nuevas versiones en GitHub Releases y muestra un cartel con las notas: "Actualizar ahora", "Ahora no" o "Saltear esta versión". Descarga, verifica el SHA-256, reemplaza la carpeta de forma atómica y vuelve atrás ante cualquier falla; al terminar avisa "POKKER se actualizó a X".
 
-**Ícono de la bandeja.** Menú: Abrir POKKER, Buscar actualizaciones, Abrir carpeta de datos, Cerrar POKKER. Si cerrás la pestaña, POKKER se apaga solo a los ~60 s, salvo que el solver esté trabajando (espera a que termine la cola).
+**Ícono de la bandeja.** Menú: Abrir POKKER, Buscar actualizaciones, Abrir carpeta de datos, Cerrar POKKER. Si cerrás la pestaña, POKKER se apaga solo en unos 3 minutos, salvo que el solver esté trabajando (espera a que termine la cola). Si la PC se suspende, al volver no se apaga: la pestaña retoma el latido. Si POKKER ya se cerró, la pestaña lo avisa ("POKKER se cerró. Abrilo de nuevo desde el ícono o con doble clic en POKKER.exe.").
 
 **Volver a una versión anterior a mano.** Con POKKER cerrado, bajá el zip anterior y reemplazá la carpeta; si hace falta, restaurá `datos.anterior\` dentro de `%LOCALAPPDATA%\POKKER`.
 
@@ -65,6 +65,13 @@ scripts\test.ps1 launcher                       # tests end-to-end del launcher 
 ```
 
 Para publicar: subí `VERSION`, agregá `## [X.Y.Z] - fecha` a `CHANGELOG.md`, hacé commit y push; después `git tag vX.Y.Z` y `git push origin vX.Y.Z`. `release.yml` compila, testea y publica el release (usa las notas de esa sección del changelog). `ci.yml` arma el paquete en cada push a una rama, sin publicar.
+
+**Contrato con los lanzadores ya instalados.** Desde la 0.7.0, `POKKER.exe` es un actualizador de larga vida: cada PC actualiza con el lanzador que ya tiene, así que nada de esto puede cambiar sin obligar a tus amigos a bajar el zip de nuevo a mano:
+
+- Feed: `https://api.github.com/repos/jcolman940/POKKER_LEARNING/releases/latest` (o el `feed` de `app\update.json`); `tag_name` = `vX.Y.Z`.
+- Assets de la release: `POKKER-X.Y.Z.zip` y `POKKER-X.Y.Z.zip.sha256` (SHA-256 en hex mayúsculas, sin BOM; el lanzador toma el primer token de 64 dígitos hex).
+- Descargas aceptadas solo desde `https://github.com/jcolman940/POKKER_LEARNING/releases/download/...` y las redirecciones de GitHub (`objects.githubusercontent.com`, `release-assets.githubusercontent.com`).
+- Estructura del zip: carpeta raíz `POKKER/` con `POKKER.exe`, `app\VERSION` (igual a `X.Y.Z`), `app\update.json`, `app\server\pokker-server.exe` y `app\web\index.html`.
 
 ## Núcleo (`pokercore`)
 

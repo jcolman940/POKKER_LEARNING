@@ -40,8 +40,8 @@ POKKER\
 - Ejecutable del servidor (`app/server_main.py`, entrada de PyInstaller): lee `POKER_HOST` (solo `127.0.0.1`) y `POKER_PORT`, arranca uvicorn sin reload.
 - Con `POKER_WEB_DIR`: FastAPI sirve el frontend en `/` (archivos estáticos con vuelta a `index.html` para rutas que no son archivos) y la API sigue en `/api`.
 - Middleware de **Host**: rechaza (400) pedidos cuyo `Host` no sea `127.0.0.1[:puerto]` o `localhost[:puerto]` cuando corre empaquetado (`POKER_LAUNCH_TOKEN` definido).
-- **Latido y apagado** (solo empaquetado): `POST /api/app/ping` (sin cuerpo); `POST /api/app/shutdown` con encabezado `X-Pokker-Token` = `POKER_LAUNCH_TOKEN` (403 si no coincide). Vigilante: tras el primer latido, si pasan 60 s sin latidos **y** el solver no tiene trabajos corriendo o en cola (o la cola está pausada), el servidor se apaga solo. `GET /api/app/status` → `{packaged, heartbeat_age_s, solver_busy, solver_pending}` para el ícono.
-- El frontend manda el latido cada 10 s solo si `GET /api/version` indica `packaged: true`.
+- **Latido y apagado** (solo empaquetado): `POST /api/app/ping` (sin cuerpo); `POST /api/app/shutdown` con encabezado `X-Pokker-Token` = `POKER_LAUNCH_TOKEN` (403 si no coincide). Vigilante: tras el primer latido, si pasan unos 3 minutos (`POKER_HEARTBEAT_TIMEOUT_S`, 180 s; decisión R7, antes 60 s) sin latidos **y** el solver no tiene trabajos corriendo o en cola (o la cola está pausada, o no hay solver instalado: sin worker la cola no cuenta), el servidor se apaga solo. Si entre dos revisiones del vigilante pasa más de 3 veces su período (PC suspendida), eso cuenta como un latido nuevo en vez de apagar. Sin solver, `/api/solver/batch` y `/api/solver/library/enqueue` responden 409. Empaquetado, los pedidos que modifican (no GET/HEAD/OPTIONS) con `Origin` ajeno o `Sec-Fetch-Site: cross-site` se rechazan (403). `GET /api/app/status` → `{packaged, heartbeat_age_s, solver_busy, solver_pending}` para el ícono.
+- El frontend manda el latido cada 10 s (y apenas la pestaña vuelve a estar visible) solo si `GET /api/version` indica `packaged: true`; tras 2 latidos fallidos seguidos muestra un aviso fijo "POKKER se cerró. Abrilo de nuevo desde el ícono o con doble clic en POKKER.exe."
 - Detección de TexasSolver: `POKER_SOLVER_PATH` si está; si no, `<data_dir>\tools\TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe` si existe.
 - El modo desarrollo (`scripts\dev.ps1`, `./var`, Vite en :5173) y los tests no cambian.
 
@@ -55,7 +55,7 @@ POKKER\
 4. Revisión de piezas: `app\VERSION`, `app\server\pokker-server.exe`, `app\web\index.html`, `app\update.json`. Si falta algo: un cartel "Falta X: volvé a bajar POKKER desde la página de releases" con el link, y salir.
 5. Puerto: primero libre en `127.0.0.1` entre 47900 y 47919 (si ninguno, cartel).
 6. Lanzar el servidor sin ventana con: `POKER_DATA_DIR`, `POKER_RESOURCES_DIR=app`, `POKER_WEB_DIR=app\web`, `POKER_HOST`, `POKER_PORT`, `POKER_LAUNCH_TOKEN` (32 bytes al azar en hex), `POKER_UPDATE_FEED_URL` (de `update.json`), `POKER_SOLVER_PATH` si el solver está en `tools\`. Salida y errores → `pokker.log`.
-7. Esperar `GET /api/version` hasta 60 s (globito "Abriendo POKKER…"); si no responde: cartel con las últimas 20 líneas del log y matar el árbol del servidor.
+7. Esperar `GET /api/version` hasta 60 s (globito "Abriendo POKKER…"); si el proceso sigue vivo, globito "Actualizando tus datos… puede tardar unos minutos" y seguir esperando hasta 10 min en total (la reconstrucción de decisiones es reanudable); solo falla antes si el proceso termina. Si no responde: cartel con las últimas 20 líneas del log y matar el árbol del servidor.
 8. Escribir `running.json`, abrir el navegador en `http://127.0.0.1:<puerto>/` (salvo `--sin-navegador`), mostrar el ícono con menú: **Abrir POKKER** · **Buscar actualizaciones** · **Abrir carpeta de datos** · **Cerrar POKKER**. Si arrancó con `--actualizado=X`, globito "POKKER se actualizó a X".
 
 ### 3.2 Durante la sesión y cierre
@@ -88,7 +88,7 @@ Ventana propia (WinForms): "Hay una versión nueva de POKKER: X (tenés Y)", nov
 2. Descomprimir en `POKKER\app.nuevo`; validar que trae `app\…` completo y que `VERSION` = tag.
 3. Copiar `poker.sqlite3` (y `-wal`/`-shm` si existen) a `datos.anterior\` (el servidor aún no corre).
 4. Renombrar `app` → `app.viejo`, `app.nuevo` → `app`.
-5. Si el `POKKER.exe` del zip difiere (SHA-256) del actual: renombrar el actual a `POKKER.exe.viejo`, copiar el nuevo, lanzar el nuevo con `--sin-actualizar --actualizado=X` y salir. Si no difiere: seguir el arranque con `--actualizado=X`.
+5. Si el `POKKER.exe` del zip difiere (SHA-256) del actual: copiarlo como `POKKER.exe.nuevo`, renombrar el actual a `POKKER.exe.viejo` y `POKKER.exe.nuevo` a `POKKER.exe` (un `.nuevo` huérfano se borra al arrancar), lanzar el nuevo con `--sin-actualizar --actualizado=X` y salir. Si no difiere: seguir el arranque con `--actualizado=X`.
 6. Cualquier falla: deshacer renombres, borrar `app.nuevo` y la descarga, cartel con el motivo, seguir con la versión que había.
 - Carpeta sin escritura: cartel "No puedo actualizar en esta carpeta: mové POKKER a Documentos (u otra carpeta tuya)" y seguir con la versión actual.
 - **Buscar actualizaciones** desde el ícono con POKKER abierto: si hay versión nueva, cartel; con Sí, preguntar por el solver si trabaja, apagar el servidor, aplicar y reabrir.
