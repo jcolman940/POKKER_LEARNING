@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import sys
+from typing import TextIO
 
 import uvicorn
 
@@ -11,11 +13,27 @@ from app.main import create_app
 from app.packaged import set_shutdown_callback
 
 
+def configure_logging(stream: TextIO | None = None) -> logging.Handler:
+    """app.* INFO (and everything WARNING+) to stderr, which the launcher copies to pokker.log.
+
+    uvicorn's access log stays off (``access_log=False``); its own lines need WARNING.
+    """
+    handler = logging.StreamHandler(stream if stream is not None else sys.stderr)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.addFilter(
+        lambda r: r.name == "app" or r.name.startswith("app.") or r.levelno >= logging.WARNING
+    )
+    logging.getLogger().addHandler(handler)
+    logging.getLogger("app").setLevel(logging.INFO)
+    return handler
+
+
 def main() -> int:
     settings = get_settings()
     if settings.host != "127.0.0.1":
         print(f"Host no permitido: {settings.host} (solo 127.0.0.1)", file=sys.stderr)
         return 2
+    configure_logging()
     server = uvicorn.Server(
         uvicorn.Config(
             create_app(),

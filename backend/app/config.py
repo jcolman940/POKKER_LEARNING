@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     launch_token: str | None = None
     host: str = "127.0.0.1"
     port: int = 8000
-    heartbeat_timeout_s: float = 60.0
+    heartbeat_timeout_s: float = 180.0
 
     # HTTP
     api_prefix: str = "/api"

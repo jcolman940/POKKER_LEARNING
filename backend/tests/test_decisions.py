@@ -1,3 +1,5 @@
+import pytest
+
 from app.domain.scenario import GameFormat
 from app.stats.decisions import extract_decisions
 from tests.hands import act, make_hand
@@ -175,6 +177,45 @@ def test_backfill_recomputes_when_version_cleared(db_session):
     assert backfill_decisions(db_session) == 3
     assert db_session.query(HandDecision).count() == 3
     assert backfill_decisions(db_session) == 0
+
+
+class _Interrupted(Exception):
+    pass
+
+
+def test_backfill_resumes_after_an_interruption(db_session, monkeypatch):
+    from app.db.models import AppMeta, Hand, HandDecision
+    from app.stats import decisions
+    from app.stats.decisions import BACKFILL_PROGRESS_KEY, VERSION_KEY, backfill_decisions
+
+    _hand_rows(db_session, 5)
+    _reset_version(db_session)
+    ids = [h.id for h in db_session.query(Hand).order_by(Hand.id)]
+    monkeypatch.setattr(decisions, "BACKFILL_CHUNK", 2)
+    real = decisions.decision_rows
+    calls = []
+
+    def flaky(record):
+        calls.append(record)
+        if len(calls) == 3:  # first record of the second chunk: the app "dies" here
+            raise _Interrupted
+        return real(record)
+
+    monkeypatch.setattr(decisions, "decision_rows", flaky)
+    with pytest.raises(_Interrupted):
+        backfill_decisions(db_session)
+    db_session.rollback()
+    assert db_session.get(AppMeta, BACKFILL_PROGRESS_KEY).value == str(ids[1])
+    assert db_session.get(AppMeta, VERSION_KEY) is None
+    assert db_session.query(HandDecision).count() == 2
+
+    calls.clear()
+    monkeypatch.setattr(decisions, "decision_rows", lambda r: calls.append(r) or real(r))
+    assert backfill_decisions(db_session) == 3  # only the hands after the stored id
+    assert len(calls) == 3
+    assert db_session.query(HandDecision).count() == 5
+    assert db_session.get(AppMeta, BACKFILL_PROGRESS_KEY) is None
+    assert db_session.get(AppMeta, VERSION_KEY) is not None
 
 
 def test_backfill_skips_corrupted_records(db_session, caplog):

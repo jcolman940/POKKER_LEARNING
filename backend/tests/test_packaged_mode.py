@@ -42,6 +42,7 @@ def pclient(tmp_path, monkeypatch, web_dir, shutdown_calls):
     monkeypatch.delenv("POKER_SOLVER_PATH", raising=False)
     monkeypatch.setenv("POKER_LAUNCH_TOKEN", TOKEN)
     monkeypatch.setenv("POKER_WEB_DIR", str(web_dir))
+    monkeypatch.setenv("POKER_PORT", "47900")
     _reset_caches()
     from app.db.session import get_engine
     from app.main import create_app
@@ -131,9 +132,10 @@ def test_shutdown_requires_token(pclient, shutdown_calls):
     assert shutdown_calls == [1]
 
 
-def test_status_reflects_solver_queue(pclient):
+def test_status_reflects_solver_queue(pclient, monkeypatch):
     from app.db.session import _session_factory
 
+    monkeypatch.setattr("app.solver.worker_registry.worker_running", lambda: True)
     base = pclient.get("/api/app/status").json()
     assert base["solver_busy"] is False and base["solver_pending"] == 0
     with _session_factory()() as s:
@@ -146,6 +148,53 @@ def test_status_reflects_solver_queue(pclient):
         s.merge(AppMeta(key=PAUSED_KEY, value="1"))
         s.commit()
     assert pclient.get("/api/app/status").json()["solver_pending"] == 0
+
+
+def test_worker_not_running_without_solver(pclient):
+    from app.solver import worker_registry
+
+    assert worker_registry.worker_running() is False
+
+
+def test_status_reports_no_work_when_the_worker_is_not_running(pclient):
+    from app.db.session import _session_factory
+
+    with _session_factory()() as s:
+        _add_job(s, "running")
+        _add_job(s, "queued")
+    body = pclient.get("/api/app/status").json()
+    assert body["solver_busy"] is False and body["solver_pending"] == 0
+
+
+# --- CSRF guard ---------------------------------------------------------------------------
+
+
+def test_cross_origin_post_rejected(pclient):
+    r = pclient.post("/api/app/ping", headers={"Origin": "http://evil.com"})
+    assert r.status_code == 403
+    r = pclient.post("/api/app/ping", headers={"Origin": "http://127.0.0.1:47901"})
+    assert r.status_code == 403
+    r = pclient.post("/api/app/ping", headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+
+
+def test_same_origin_and_originless_posts_allowed(pclient):
+    for origin in ("http://127.0.0.1:47900", "http://localhost:47900"):
+        r = pclient.post(
+            "/api/app/ping", headers={"Origin": origin, "Sec-Fetch-Site": "same-origin"}
+        )
+        assert r.status_code == 204, origin
+    assert pclient.post("/api/app/ping").status_code == 204
+
+
+def test_cross_origin_get_is_not_blocked(pclient):
+    r = pclient.get("/api/version", headers={"Origin": "http://evil.com"})
+    assert r.status_code == 200
+
+
+def test_dev_mode_has_no_csrf_guard(client):
+    r = client.post("/api/ranges/parse", json={"text": "AA"}, headers={"Origin": "http://evil.com"})
+    assert r.status_code != 403
 
 
 # --- watchdog -----------------------------------------------------------------------------
@@ -194,6 +243,59 @@ def test_watchdog_fires_after_timeout_without_work():
     assert wd.check() is True and fired == [1]
 
 
+def test_default_heartbeat_timeout_is_three_minutes(monkeypatch):
+    monkeypatch.delenv("POKER_HEARTBEAT_TIMEOUT_S", raising=False)
+    from app.config import Settings
+
+    assert Settings().heartbeat_timeout_s == 180
+
+
+def _gap_watchdog(timeout=10.0, check_every=5.0):
+    clock = _Clock()
+    hb = Heartbeat(clock=clock)
+    fired = []
+    wd = Watchdog(
+        hb, timeout, lambda: False, check_every=check_every, on_timeout=lambda: fired.append(1)
+    )
+    return clock, hb, wd, fired
+
+
+def test_watchdog_treats_a_suspend_gap_as_a_fresh_beat():
+    clock, hb, wd, fired = _gap_watchdog()
+    hb.beat()
+    assert wd.check() is False
+    clock.t += 3600  # the PC slept: way more than 3 x check_every since the last check
+    assert wd.check() is False and fired == []
+    assert hb.age() == 0
+    # Regular checks afterwards: the timeout counts again from the wake-up.
+    for _ in range(2):
+        clock.t += 5
+        assert wd.check() is False
+    clock.t += 5
+    assert wd.check() is True and fired == [1]
+
+
+def test_watchdog_without_gap_still_fires_on_regular_checks():
+    clock, hb, wd, fired = _gap_watchdog()
+    hb.beat()
+    for _ in range(2):
+        clock.t += 5
+        assert wd.check() is False
+    clock.t += 5
+    assert wd.check() is True and fired == [1]
+
+
+def test_watchdog_logs_shutdown_as_warning(caplog):
+    clock, hb, wd, fired = _gap_watchdog()
+    hb.beat()
+    clock.t += 11
+    with caplog.at_level("WARNING", logger="app.packaged"):
+        assert wd.check() is True
+    assert any(
+        r.levelname == "WARNING" and "No heartbeat" in r.getMessage() for r in caplog.records
+    )
+
+
 def test_watchdog_thread_fires_and_stops():
     import time
 
@@ -239,6 +341,36 @@ def test_lifespan_watchdog_shuts_down_idle_app(tmp_path, monkeypatch, shutdown_c
     assert shutdown_calls
 
 
+def test_lifespan_watchdog_ignores_queued_jobs_without_solver(
+    tmp_path, monkeypatch, shutdown_calls
+):
+    import time
+
+    monkeypatch.setenv("POKER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.delenv("POKER_DATABASE_URL", raising=False)
+    monkeypatch.delenv("POKER_SOLVER_PATH", raising=False)
+    monkeypatch.setenv("POKER_LAUNCH_TOKEN", TOKEN)
+    monkeypatch.setenv("POKER_HEARTBEAT_TIMEOUT_S", "0.05")
+    monkeypatch.delenv("POKER_WEB_DIR", raising=False)
+    _reset_caches()
+    from app.db.session import _session_factory, get_engine
+    from app.main import create_app
+
+    app = create_app()
+    app.state.watchdog_check_every = 0.01
+    with TestClient(app, base_url="http://127.0.0.1:47900") as c:
+        with _session_factory()() as s:
+            _add_job(s, "queued")  # can never run: there is no solver
+        c.post("/api/app/ping")
+        deadline = time.monotonic() + 3
+        while not shutdown_calls and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert c.get("/api/app/status").json()["solver_pending"] == 0
+    get_engine().dispose()
+    _reset_caches()
+    assert shutdown_calls
+
+
 # --- development mode regression ----------------------------------------------------------
 
 
@@ -262,3 +394,26 @@ def test_server_main_rejects_non_loopback_host(monkeypatch):
         assert server_main.main() == 2
     finally:
         get_settings.cache_clear()
+
+
+def test_server_logging_sends_app_info_to_the_stream():
+    import io
+    import logging
+
+    from app import server_main
+
+    stream = io.StringIO()
+    app_logger = logging.getLogger("app")
+    level = app_logger.level
+    handler = server_main.configure_logging(stream)
+    try:
+        logging.getLogger("app.packaged").info("hola desde app")
+        logging.getLogger("uvicorn.access").warning("GET / 200")
+        logging.getLogger("uvicorn.error").info("Started server process")
+    finally:
+        logging.getLogger().removeHandler(handler)
+        app_logger.setLevel(level)
+    out = stream.getvalue()
+    assert "hola desde app" in out
+    assert "GET / 200" in out  # WARNING and above from anyone still reach the log
+    assert "Started server process" not in out

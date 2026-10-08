@@ -100,7 +100,8 @@ def test_cache_delete(client):
     assert client.delete("/api/solver/cache").json() == {"deleted": 1}
 
 
-def test_library_reports_missing_charts(client):
+def test_library_reports_missing_charts(client, monkeypatch):
+    monkeypatch.setattr("app.api.solver.solver_available", lambda: True)
     body = client.get("/api/solver/library").json()
     assert {f["id"] for f in body} == {"mtt", "cash"}
     line = body[1]["lines"][0]
@@ -109,7 +110,8 @@ def test_library_reports_missing_charts(client):
     assert r["enqueued"] == 0 and r["missing"]
 
 
-def test_batch_validates_flops(client):
+def test_batch_validates_flops(client, monkeypatch):
+    monkeypatch.setattr("app.api.solver.solver_available", lambda: True)
     body = {
         "game_format": "cash",
         "players": 6,
@@ -203,3 +205,18 @@ def test_batch_default_preset_is_chico():
     from app.api.solver import BatchIn
 
     assert BatchIn.model_fields["preset"].default == "chico"
+
+
+NO_SOLVER = "Descargá TexasSolver en Solver → Configuración para resolver spots."
+
+
+def test_batch_without_solver_is_409(client):
+    r = client.post("/api/solver/batch", json=_batch_body(["AhKd2c"]))
+    assert r.status_code == 409
+    assert r.json()["detail"] == NO_SOLVER
+
+
+def test_library_enqueue_without_solver_is_409(client):
+    r = client.post("/api/solver/library/enqueue", json={"family": "cash", "line": "btn_bb"})
+    assert r.status_code == 409
+    assert r.json()["detail"] == NO_SOLVER

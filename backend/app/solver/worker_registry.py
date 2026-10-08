@@ -14,6 +14,11 @@ def solver_available() -> bool:
     return detected_solver_path(get_settings()) is not None
 
 
+def worker_running() -> bool:
+    """True while the queue worker exists: without it, queued jobs can never run."""
+    return _worker is not None
+
+
 def start_worker() -> None:
     global _worker
     path = detected_solver_path(get_settings())

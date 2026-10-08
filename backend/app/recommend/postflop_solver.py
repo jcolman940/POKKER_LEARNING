@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pokercore
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.domain.cards import parse_cards
 from app.domain.positions import postflop_order
 from app.domain.scenario import Scenario
@@ -166,6 +167,10 @@ def recommend_solver(scenario: Scenario, session: Session) -> RecommendationOut:
         except ValueError as e:
             return _unavailable(str(e))
     if not solver_available():
+        if get_settings().packaged:
+            return _unavailable(
+                "Descargá TexasSolver en Solver → Configuración (39 MB) para usar el solver."
+            )
         return _unavailable(
             "El solver no está configurado: definí POKER_SOLVER_PATH con la ruta de "
             "console_solver.exe de TexasSolver."

@@ -18,6 +18,8 @@ from app.recommend.preflop_equity import hand_class
 
 DECISIONS_VERSION = 2
 VERSION_KEY = "decisions_version"
+# Last hand id recomputed by an unfinished backfill: a restart resumes after it.
+BACKFILL_PROGRESS_KEY = "decisions_backfill_last_id"
 BACKFILL_CHUNK = 500
 logger = logging.getLogger(__name__)
 RAISE_LABEL = {0: "raise", 1: "3bet", 2: "4bet"}
@@ -132,13 +134,21 @@ def backfill_decisions(session: Session) -> int:
     """Recompute every hand's decisions when the stored version is stale.
 
     Works in chunks (only id and record are loaded) and skips records that no longer
-    validate instead of failing. Returns the number of hands processed.
+    validate instead of failing. Progress is committed with every chunk, so an interrupted
+    run (app closed or killed mid-way) resumes after the last finished chunk. Returns the
+    number of hands processed by this call.
     """
     meta = session.get(AppMeta, VERSION_KEY)
     if meta is not None and meta.value == str(DECISIONS_VERSION):
         return 0
     count = skipped = 0
-    last_id = 0
+    progress = session.get(AppMeta, BACKFILL_PROGRESS_KEY)
+    try:
+        last_id = int(progress.value) if progress is not None else 0
+    except ValueError:
+        last_id = 0
+    if last_id:
+        logger.info("Resuming the decision backfill after hand id %d", last_id)
     while True:
         rows = session.execute(
             select(Hand.id, Hand.record)
@@ -160,9 +170,13 @@ def backfill_decisions(session: Session) -> int:
                 row.hand_id = hand_id
             session.add_all(new)
             count += 1
+        session.merge(AppMeta(key=BACKFILL_PROGRESS_KEY, value=str(last_id)))
         session.commit()
     if skipped:
         logger.warning("Decision backfill skipped %d stored hands that failed to parse", skipped)
     session.merge(AppMeta(key=VERSION_KEY, value=str(DECISIONS_VERSION)))
+    done = session.get(AppMeta, BACKFILL_PROGRESS_KEY)
+    if done is not None:
+        session.delete(done)
     session.commit()
     return count

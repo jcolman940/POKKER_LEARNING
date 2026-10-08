@@ -78,6 +78,24 @@ def test_uncached_without_solver_explains_configuration(db_session, monkeypatch)
     assert not rec.available and "POKER_SOLVER_PATH" in rec.message
 
 
+def test_uncached_without_solver_packaged_points_to_the_download(db_session, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr("app.recommend.postflop_solver.solver_available", lambda: False)
+    monkeypatch.setenv("POKER_LAUNCH_TOKEN", "t")
+    get_settings.cache_clear()
+    try:
+        rec = recommend_solver(scenario(), db_session)
+    finally:
+        monkeypatch.delenv("POKER_LAUNCH_TOKEN")
+        get_settings.cache_clear()
+    assert not rec.available
+    assert rec.message == (
+        "Descargá TexasSolver en Solver → Configuración (39 MB) para usar el solver."
+    )
+    assert "POKER_SOLVER_PATH" not in rec.message
+
+
 def test_uncached_enqueues_a_simulator_job(db_session, monkeypatch):
     monkeypatch.setattr("app.recommend.postflop_solver.solver_available", lambda: True)
     rec = recommend_solver(scenario(), db_session)

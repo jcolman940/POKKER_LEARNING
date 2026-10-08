@@ -22,7 +22,7 @@ from app.config import get_settings
 from app.db import run_migrations
 from app.db.session import _session_factory
 from app.packaged import Heartbeat, Watchdog, install_host_check, mount_web
-from app.solver.worker_registry import start_worker, stop_worker
+from app.solver.worker_registry import start_worker, stop_worker, worker_running
 from app.stats.decisions import backfill_decisions
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,8 @@ async def lifespan(app: FastAPI):
 def _solver_has_work() -> bool:
     from app.api.app_control import solver_activity
 
+    if not worker_running():  # no solver: queued jobs can never run
+        return False
     with _session_factory()() as session:
         busy, pending = solver_activity(session)
     return busy or pending > 0
@@ -97,7 +99,7 @@ def create_app() -> FastAPI:
     if settings.packaged:
         if settings.web_dir is not None:
             mount_web(app, settings.web_dir)
-        install_host_check(app)
+        install_host_check(app, settings.port)
 
     return app
 

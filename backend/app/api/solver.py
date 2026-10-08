@@ -34,6 +34,12 @@ from app.solver.worker_registry import solver_available
 
 router = APIRouter(prefix="/solver", tags=["solver"])
 DbSession = Annotated[Session, Depends(get_session)]
+NO_SOLVER_DETAIL = "Descargá TexasSolver en Solver → Configuración para resolver spots."
+
+
+def _require_solver() -> None:
+    if not solver_available():
+        raise HTTPException(409, NO_SOLVER_DETAIL)
 
 
 class JobOut(BaseModel):
@@ -223,6 +229,7 @@ def batch(body: BatchIn, session: DbSession) -> dict:
             cards = []
         if len(cards) != 3 or len(set(cards)) != 3:
             raise HTTPException(422, f"Flop inválido: {f} (3 cartas distintas, p. ej. AhKd2c)")
+    _require_solver()
     missing = build_line_spots(session, family, line, flops or ["AhKd2c"]).missing
     enqueued = 0 if missing else enqueue_line(session, family, line, flops, q.Origin.BATCH)
     return {"enqueued": enqueued, "missing": missing}
@@ -246,6 +253,7 @@ def library_enqueue(body: LibraryEnqueueIn, session: DbSession) -> dict:
     lines = [ln for ln in family.lines if body.line in (None, ln.id)]
     if not lines:
         raise HTTPException(404, f"No existe la línea {body.line}")
+    _require_solver()
     enqueued, missing = 0, []
     for line in lines:
         built = build_line_spots(session, family, line, representative_flops()[:1])

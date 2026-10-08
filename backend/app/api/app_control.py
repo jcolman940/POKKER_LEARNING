@@ -12,6 +12,7 @@ from app.config import Settings, get_settings
 from app.db import get_session
 from app.db.models import SolverJob
 from app.packaged import request_shutdown
+from app.solver import worker_registry
 from app.solver.queue import is_paused
 
 router = APIRouter(prefix="/app", tags=["app"])
@@ -25,7 +26,13 @@ class AppStatus(BaseModel):
 
 
 def solver_activity(session: Session) -> tuple[bool, int]:
-    """(a job is running, queued jobs waiting while the queue is not paused)."""
+    """(a job is running, queued jobs waiting while the queue is not paused).
+
+    Without a running worker (no solver installed) nothing can ever run: report no work, so
+    the watchdog does not keep the server alive for jobs that will never start.
+    """
+    if not worker_registry.worker_running():
+        return False, 0
     running = session.scalar(
         select(func.count()).select_from(SolverJob).where(SolverJob.status == "running")
     )
