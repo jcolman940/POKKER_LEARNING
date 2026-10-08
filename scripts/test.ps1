@@ -15,15 +15,15 @@ function Invoke-Checked {
 
 function Test-Core {
     Write-Host '==> core (C++)'
-    $build = Join-Path $Root 'core/build/dev'
-    Invoke-Checked { cmake -S (Join-Path $Root 'core') -B $build }
+    $build = Join-Path $Root 'src/core/build/dev'
+    Invoke-Checked { cmake -S (Join-Path $Root 'src/core') -B $build }
     Invoke-Checked { cmake --build $build --config Release }
     Invoke-Checked { ctest --test-dir $build -C Release --output-on-failure }
 }
 
 function Test-Backend {
     Write-Host '==> backend (Python)'
-    Push-Location (Join-Path $Root 'backend')
+    Push-Location (Join-Path $Root 'src/backend')
     try {
         Invoke-Checked { uv sync --quiet }
         Invoke-Checked { uv run ruff check . }
@@ -34,7 +34,7 @@ function Test-Backend {
 
 function Test-Frontend {
     Write-Host '==> frontend (TypeScript)'
-    Push-Location (Join-Path $Root 'frontend')
+    Push-Location (Join-Path $Root 'src/frontend')
     try {
         Invoke-Checked { npm ci --silent }
         Invoke-Checked { npm run typecheck }
@@ -45,7 +45,7 @@ function Test-Frontend {
 
 function Test-Integration {
     Write-Host '==> integration'
-    Push-Location (Join-Path $Root 'backend')
+    Push-Location (Join-Path $Root 'src/backend')
     try {
         Invoke-Checked { uv sync --quiet }
         Invoke-Checked { uv run pytest -q (Join-Path $Root 'tests/integration') }
@@ -57,7 +57,7 @@ function Test-Launcher {
     if (-not (Test-Path (Join-Path $Root 'dist/POKKER/POKKER.exe'))) {
         Write-Warning 'No existe dist\POKKER\POKKER.exe: corre scripts\package.ps1 antes (las pruebas se saltean).'
     }
-    Push-Location (Join-Path $Root 'backend')
+    Push-Location (Join-Path $Root 'src/backend')
     try {
         Invoke-Checked { uv sync --quiet }
         Invoke-Checked { uv run pytest -q -rs (Join-Path $Root 'tests/launcher') }

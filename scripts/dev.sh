@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-(cd "$ROOT/backend" && uv sync --quiet && uv run uvicorn app.main:app --reload --reload-dir app --host 127.0.0.1 --port 8000) &
+(cd "$ROOT/src/backend" && uv sync --quiet && uv run uvicorn app.main:app --reload --reload-dir app --host 127.0.0.1 --port 8000) &
 BACKEND_PID=$!
 trap 'kill $BACKEND_PID 2>/dev/null || true' EXIT
-(cd "$ROOT/frontend" && npm install --silent && npm run dev)
+(cd "$ROOT/src/frontend" && npm install --silent && npm run dev)

@@ -1,6 +1,6 @@
 # Compiles the POKKER.exe launcher with the .NET Framework 4 C# compiler (C# 5).
-# Usage (from anywhere): powershell -ExecutionPolicy Bypass -File launcher\build.ps1 [-Out <dir>]
-# Default output: launcher\out\POKKER.exe (ignored by git).
+# Usage (from anywhere): powershell -ExecutionPolicy Bypass -File src\launcher\build.ps1 [-Out <dir>]
+# Default output: src\launcher\out\POKKER.exe (ignored by git).
 param([string]$Out = (Join-Path $PSScriptRoot 'out'))
 $ErrorActionPreference = 'Stop'
 

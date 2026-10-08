@@ -4,7 +4,7 @@ Runs the real dist\\POKKER\\POKKER.exe built by scripts\\package.ps1 against a l
 release feed (http.server on 127.0.0.1, random port). Every test works on its own copy of
 dist\\POKKER and its own --datos folder; nothing touches %LOCALAPPDATA%\\POKKER.
 
-Run from backend\\: uv run pytest -q ../tests/launcher   (or scripts\\test.ps1 launcher)
+Run from src\\backend\\: uv run pytest -q ../../tests/launcher   (or scripts\\test.ps1 launcher)
 """
 
 from __future__ import annotations

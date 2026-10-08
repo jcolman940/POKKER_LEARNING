@@ -2,18 +2,20 @@
 
 Herramienta personal de estudio de poker (rangos, equity, EV), **local-first** y solo
 para análisis post-sesión y práctica: sin HUD ni asistencia en tiempo real.
-La especificación completa está en [`SPEC.md`](SPEC.md).
+La especificación completa está en [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Estructura
 
 ```
-/core        C++20: evaluador, equity, bindings pybind11 (paquete Python `pokercore`)
-/backend     FastAPI: app/{api,parsers,stats,recommend,solver,db}, Alembic
-/frontend    React + TypeScript + Vite (UI en español)
-/data        rangos preflop (JSON), spots precalculados
-/tests       fixtures de historiales, tests de integración
-/scripts     test.sh, dev.sh
-VERSION      versión de la app (única fuente de verdad)
+/src/core       C++20: evaluador, equity, bindings pybind11 (paquete Python `pokercore`)
+/src/backend    FastAPI: app/{api,parsers,stats,recommend,solver,db}, Alembic
+/src/frontend   React + TypeScript + Vite (UI en español)
+/src/launcher   POKKER.exe (C# 5, .NET Framework 4): launcher y actualizador
+/data           rangos preflop (JSON), spots y árboles del solver, precalculados
+/tests          tests de integración y e2e del launcher
+/scripts        test, dev, package y bench (.ps1 / .sh)
+/docs           SPEC.md, specs y planes por fase
+VERSION         versión de la app (única fuente de verdad)
 ```
 
 ## Requisitos
@@ -27,8 +29,8 @@ Plataforma objetivo: **Windows** (CI en `windows-latest` con MSVC). En Linux/mac
 ## Uso (Windows, PowerShell)
 
 ```powershell
-cd backend; uv sync; cd ..      # instala dependencias y compila el núcleo C++ como paquete Python
-cd frontend; npm install; cd ..
+cd src\backend; uv sync; cd ..\..   # instala dependencias y compila el núcleo C++ como paquete Python
+cd src\frontend; npm install; cd ..\..
 scripts\dev.ps1                  # backend en :8000 y frontend en :5173
 scripts\test.ps1                 # core (ctest) + backend (ruff, pytest) + frontend (tsc, oxlint, vitest) + integración
 scripts\test.ps1 core backend    # solo algunas suites
@@ -120,10 +122,10 @@ Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuen
 ## Historiales, estadísticas y replayer (fase 4)
 
 - **Importación** (`POST /api/imports`, pestaña *Historiales*): `.txt` y `.zip`, sala detectada por contenido
-  (un parser por sala en `backend/app/parsers/`), idempotente por (sala, id de mano), tolerante a errores
+  (un parser por sala en `src/backend/app/parsers/`), idempotente por (sala, id de mano), tolerante a errores
   con reporte de archivo/mano/línea. **Los parsers de GGPoker y PokerStars se escriben contra archivos
   reales de muestra**: hasta tenerlos, ninguna sala está soportada.
-- **Modelo normalizado** `HandRecord` (`backend/app/domain/hand.py`): lo producen los parsers y lo consumen
+- **Modelo normalizado** `HandRecord` (`src/backend/app/domain/hand.py`): lo producen los parsers y lo consumen
   estadísticas, replayer y entrenador/leak finder (fase 6).
 - **Estadísticas** (`/api/stats`): VPIP, PFR, 3-bet, fold to 3-bet, c-bet flop/turn, fold to c-bet, WTSD, W$SD,
   AF/AFq, winrate y winrate all-in EV (bb/100), con muestra, IC 95% y aviso de muestra insuficiente
@@ -139,7 +141,7 @@ externo (AGPL: solo se ejecuta por subprocess, su código no se incluye).
 
 **Instalación.** Bajá el zip de Windows de la release (SHA-256
 `0A9122FA0CD9384E6C1CBE0492E8A3B8AC7809890C649E1A53F77A59D6D50A7C`), descomprimilo y apuntá al
-binario `console_solver.exe` (con su carpeta de recursos al lado). Por ejemplo, en `backend/.env`:
+binario `console_solver.exe` (con su carpeta de recursos al lado). Por ejemplo, en `src/backend/.env`:
 
 ```
 POKER_SOLVER_PATH=C:\tools\TexasSolver\TexasSolver-v0.2.0-Windows\console_solver.exe
@@ -224,8 +226,8 @@ Necesita manos importadas (los parsers de GGPoker y PokerStars esperan archivos 
 
 ## Configuración
 
-Centralizada en `backend/app/config.py`. Toda opción se puede sobreescribir con
-variables `POKER_*` o un archivo `.env` en `backend/`:
+Centralizada en `src/backend/app/config.py`. Toda opción se puede sobreescribir con
+variables `POKER_*` o un archivo `.env` en `src/backend/`:
 
 | Variable | Default | Uso |
 |---|---|---|
@@ -235,7 +237,7 @@ variables `POKER_*` o un archivo `.env` en `backend/`:
 | `POKER_PUSHFOLD_MAX_BB` | `15` | Stack efectivo máximo para usar push/fold en torneos |
 | `POKER_HERO_NAMES` | `[]` | Nombres a usar como Hero si el archivo no lo indica (JSON) |
 | `POKER_STATS_MIN_SAMPLE` | `100` | Muestra mínima antes de marcar una métrica como insuficiente |
-| `POKER_SOLVER_PATH` | — | Ruta a `console_solver.exe` de TexasSolver v0.2.0 (ej. en `backend/.env`) |
+| `POKER_SOLVER_PATH` | — | Ruta a `console_solver.exe` de TexasSolver v0.2.0 (ej. en `src/backend/.env`) |
 | `POKER_SOLVER_THREADS` | núcleos de CPU | Hilos que usa el solver |
 | `POKER_SOLVER_TIMEOUT_MIN` | `30` | Tiempo máximo por solve (minutos) |
 | `POKER_HEURISTIC_VALUE_SHARE` | `0.65` | Heurística multiway: fracción mínima de cada rango rival a la que Hero le gana para apostar por valor |

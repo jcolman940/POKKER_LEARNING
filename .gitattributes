@@ -1,1 +1,1 @@
-backend/tests/fixtures/solver/*.txt text eol=lf
+src/backend/tests/fixtures/solver/*.txt text eol=lf

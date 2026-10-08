@@ -8,24 +8,24 @@ targets=("$@")
 
 run_core() {
   echo "==> core (C++)"
-  cmake -S "$ROOT/core" -B "$ROOT/core/build/dev" -G Ninja -DCMAKE_BUILD_TYPE=Release
-  cmake --build "$ROOT/core/build/dev"
-  ctest --test-dir "$ROOT/core/build/dev" --output-on-failure
+  cmake -S "$ROOT/src/core" -B "$ROOT/src/core/build/dev" -G Ninja -DCMAKE_BUILD_TYPE=Release
+  cmake --build "$ROOT/src/core/build/dev"
+  ctest --test-dir "$ROOT/src/core/build/dev" --output-on-failure
 }
 
 run_backend() {
   echo "==> backend (Python)"
-  (cd "$ROOT/backend" && uv sync --quiet && uv run ruff check . && uv run ruff format --check . && uv run pytest -q)
+  (cd "$ROOT/src/backend" && uv sync --quiet && uv run ruff check . && uv run ruff format --check . && uv run pytest -q)
 }
 
 run_frontend() {
   echo "==> frontend (TypeScript)"
-  (cd "$ROOT/frontend" && npm ci --silent && npm run typecheck && npm run lint && npm test)
+  (cd "$ROOT/src/frontend" && npm ci --silent && npm run typecheck && npm run lint && npm test)
 }
 
 run_integration() {
   echo "==> integration"
-  (cd "$ROOT/backend" && uv sync --quiet && uv run pytest -q "$ROOT/tests/integration")
+  (cd "$ROOT/src/backend" && uv sync --quiet && uv run pytest -q "$ROOT/tests/integration")
 }
 
 for t in "${targets[@]}"; do

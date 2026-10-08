@@ -2,9 +2,9 @@
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\package.ps1 [-Version X.Y.Z] [-SkipTests]
 #
 #   1. core (C++, Release; ctest unless -SkipTests)
-#   2. backend: uv sync --group package + PyInstaller (backend\pokker-server.spec) -> build\server
-#   3. frontend: npm ci + npm run build -> frontend\dist
-#   4. launcher: launcher\build.ps1 -Out build\launcher
+#   2. backend: uv sync --group package + PyInstaller (src\backend\pokker-server.spec) -> build\server
+#   3. frontend: npm ci + npm run build -> src\frontend\dist
+#   4. launcher: src\launcher\build.ps1 -Out build\launcher
 #   5. dist\POKKER\ (POKKER.exe + app\{VERSION, update.json, server, web, data})
 #   6. smoke test on a temp copy with a temp --datos (never %LOCALAPPDATA%\POKKER)
 #   7. dist\POKKER-X.Y.Z.zip + dist\POKKER-X.Y.Z.zip.sha256 (uppercase hex, no BOM)
@@ -77,8 +77,8 @@ function Get-PackageVersion {
 
 function Build-Core {
     Step 'core (C++, Release)'
-    $out = Join-Path $Root 'core/build/dev'
-    Invoke-Checked 'cmake (configurar)' { cmake -S (Join-Path $Root 'core') -B $out }
+    $out = Join-Path $Root 'src/core/build/dev'
+    Invoke-Checked 'cmake (configurar)' { cmake -S (Join-Path $Root 'src/core') -B $out }
     Invoke-Checked 'cmake (compilar)' { cmake --build $out --config Release }
     if (-not $SkipTests) {
         Invoke-Checked 'ctest' { ctest --test-dir $out -C Release --output-on-failure }
@@ -87,7 +87,7 @@ function Build-Core {
 
 function Build-Server {
     Step 'servidor (PyInstaller)'
-    Push-Location (Join-Path $Root 'backend')
+    Push-Location (Join-Path $Root 'src/backend')
     try {
         # Also (re)builds pokercore from core\ into .venv when its sources changed.
         Invoke-Checked 'uv sync --group package' { uv sync --group package }
@@ -103,18 +103,18 @@ function Build-Server {
 
 function Build-Frontend {
     Step 'frontend (Vite build)'
-    Push-Location (Join-Path $Root 'frontend')
+    Push-Location (Join-Path $Root 'src/frontend')
     try {
         Invoke-Checked 'npm ci' { npm ci --silent }
         Invoke-Checked 'npm run build' { npm run build }
     } finally { Pop-Location }
-    if (-not (Test-Path (Join-Path $Root 'frontend\dist\index.html'))) { Fail 'el build del frontend no genero index.html' }
+    if (-not (Test-Path (Join-Path $Root 'src\frontend\dist\index.html'))) { Fail 'el build del frontend no genero index.html' }
 }
 
 function Build-Launcher {
     Step 'lanzador (csc.exe)'
     Invoke-Checked 'launcher\build.ps1' {
-        powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'launcher\build.ps1') -Out (Join-Path $Build 'launcher')
+        powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'src\launcher\build.ps1') -Out (Join-Path $Build 'launcher')
     }
 }
 
@@ -135,7 +135,7 @@ function New-Package {
     [IO.File]::WriteAllText((Join-Path $app 'VERSION'), "$Version`n", $Utf8NoBom)
     [IO.File]::WriteAllText((Join-Path $app 'update.json'), "{`"feed`": `"$Feed`"}`n", $Utf8NoBom)
     Copy-Tree (Join-Path $Build 'server\pokker-server') (Join-Path $app 'server')
-    Copy-Tree (Join-Path $Root 'frontend\dist') (Join-Path $app 'web')
+    Copy-Tree (Join-Path $Root 'src\frontend\dist') (Join-Path $app 'web')
 
     # Resources: never the user's external ranges, only the shipped placeholder and README.
     $data = Join-Path $app 'data'

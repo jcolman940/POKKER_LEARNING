@@ -2,7 +2,7 @@
 build/
 dist/
 *.egg-info/
-core/build/
+src/core/build/
 
 # Python
 __pycache__/
@@ -14,7 +14,7 @@ __pycache__/
 
 # Node
 node_modules/
-frontend/dist/
+src/frontend/dist/
 
 # Local data
 *.sqlite
@@ -29,4 +29,4 @@ frontend/dist/
 
 # Local app data
 var/
-launcher/out/
+src/launcher/out/

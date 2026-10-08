@@ -1,8 +1,8 @@
 .PHONY: setup dev bench test test-core test-backend test-frontend test-integration migrate
 
 setup:
-	cd backend && uv sync
-	cd frontend && npm install
+	cd src/backend && uv sync
+	cd src/frontend && npm install
 
 dev:
 	scripts/dev.sh
@@ -26,4 +26,4 @@ test-integration:
 	scripts/test.sh integration
 
 migrate:
-	cd backend && uv run alembic upgrade head
+	cd src/backend && uv run alembic upgrade head

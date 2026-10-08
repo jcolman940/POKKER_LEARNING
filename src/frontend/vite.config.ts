@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 
 // Single source of truth for the app version: the repo-root VERSION file.
 const appVersion = readFileSync(
-  fileURLToPath(new URL('../VERSION', import.meta.url)),
+  fileURLToPath(new URL('../../VERSION', import.meta.url)),
   'utf-8',
 ).trim()
 

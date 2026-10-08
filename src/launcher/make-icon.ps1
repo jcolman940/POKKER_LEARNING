@@ -1,6 +1,6 @@
-# Generates launcher\pokker.ico: dark green rounded square with a white "P",
+# Generates src\launcher\pokker.ico: dark green rounded square with a white "P",
 # 16/32/48 px, 32-bit BMP (DIB) entries so csc /win32icon and every Windows shell accept it.
-# Usage (from the repo root): powershell -ExecutionPolicy Bypass -File launcher\make-icon.ps1
+# Usage (from the repo root): powershell -ExecutionPolicy Bypass -File src\launcher\make-icon.ps1
 param([string]$Out = (Join-Path $PSScriptRoot 'pokker.ico'))
 $ErrorActionPreference = 'Stop'
 

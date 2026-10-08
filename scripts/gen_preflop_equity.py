@@ -1,7 +1,7 @@
 """Regenerates data/precomputed/preflop_equity_169.npy (heads-up class vs class equity).
 
 Run from the backend environment:
-    cd backend && uv run python ../scripts/gen_preflop_equity.py [trials_per_pair]
+    cd src/backend && uv run python ../../scripts/gen_preflop_equity.py [trials_per_pair]
 """
 
 import json
