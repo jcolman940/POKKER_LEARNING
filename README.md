@@ -37,6 +37,35 @@ scripts\bench.ps1                # benchmark del evaluador y de equity
 
 En Linux/macOS: `make setup | dev | test | bench | migrate` (usa `scripts/*.sh`).
 
+## Instalar y actualizar POKKER (para tus amigos)
+
+1. Bajá `POKKER-X.Y.Z.zip` desde [Releases](https://github.com/jcolman940/POKKER_LEARNING/releases).
+2. Descomprimilo en una carpeta tuya (por ejemplo Documentos) y hacé doble clic en `POKKER.exe`.
+3. Windows SmartScreen puede avisar porque la app no está firmada: "Más información → Ejecutar de todas formas".
+
+Necesita Windows 10/11 (.NET Framework 4.x ya viene incluido) y un navegador predeterminado.
+
+**Datos.** Quedan en `%LOCALAPPDATA%\POKKER`: `poker.sqlite3`, trabajos del solver, `tools\TexasSolver`, `pokker.log`, `launcher.json` y `datos.anterior\` (copia de seguridad antes de cada actualización). Las actualizaciones nunca los tocan.
+
+**Actualizaciones.** Al abrir, POKKER busca nuevas versiones en GitHub Releases y muestra un cartel con las notas: "Actualizar ahora", "Ahora no" o "Saltear esta versión". Descarga, verifica el SHA-256, reemplaza la carpeta de forma atómica y vuelve atrás ante cualquier falla; al terminar avisa "POKKER se actualizó a X".
+
+**Ícono de la bandeja.** Menú: Abrir POKKER, Buscar actualizaciones, Abrir carpeta de datos, Cerrar POKKER. Si cerrás la pestaña, POKKER se apaga solo a los ~60 s, salvo que el solver esté trabajando (espera a que termine la cola).
+
+**Volver a una versión anterior a mano.** Con POKKER cerrado, bajá el zip anterior y reemplazá la carpeta; si hace falta, restaurá `datos.anterior\` dentro de `%LOCALAPPDATA%\POKKER`.
+
+**TexasSolver.** Solver → Configuración → "Descargar TexasSolver (39 MB)" (AGPL, versión oficial, hash verificado); no hace falta reiniciar.
+
+**Limitaciones.** Sin firma de código (SmartScreen), sin instalador, solo Windows, vuelta atrás manual.
+
+## Para el desarrollador: empaquetar y publicar
+
+```powershell
+scripts\package.ps1 [-Version X] [-SkipTests]   # genera dist\POKKER + POKKER-X.Y.Z.zip + .sha256 (requiere MSVC Build Tools, uv, Node)
+scripts\test.ps1 launcher                       # tests end-to-end del launcher contra dist\POKKER
+```
+
+Para publicar: subí `VERSION`, agregá `## [X.Y.Z] - fecha` a `CHANGELOG.md`, hacé commit y push; después `git tag vX.Y.Z` y `git push origin vX.Y.Z`. `release.yml` compila, testea y publica el release (usa las notas de esa sección del changelog). `ci.yml` arma el paquete en cada push a una rama, sin publicar.
+
 ## Núcleo (`pokercore`)
 
 ```python
@@ -209,7 +238,12 @@ variables `POKER_*` o un archivo `.env` en `backend/`:
 | `POKER_HEURISTIC_REALIZATION_LAST` | `0.95` | Heurística multiway: factor de realización de equity en posición / última en hablar |
 | `POKER_HEURISTIC_MARGIN` | `0.03` | Heurística multiway: margen alrededor de los umbrales para mezclar acciones |
 | `POKER_LEAKS_MIN_SAMPLE` | `50` | Muestra mínima por spot para que el leak finder marque un leak |
-| `POKER_UPDATE_FEED_URL` | — | Canal de actualizaciones (fase 7) |
+| `POKER_UPDATE_FEED_URL` | — | Canal de actualizaciones que usa el launcher (feed en `app\update.json`) |
+| `POKER_RESOURCES_DIR` | — | Carpeta de recursos (rangos, migraciones) en modo empaquetado |
+| `POKER_WEB_DIR` | — | Carpeta del frontend compilado que sirve el backend |
+| `POKER_LAUNCH_TOKEN` | — | Token que define el launcher al iniciar el backend |
+| `POKER_HOST` | `127.0.0.1` | Interfaz donde escucha el backend |
+| `POKER_PORT` | — | Puerto del backend |
 
 La versión de la app se lee de `VERSION` y se expone en `GET /api/version`.
 
