@@ -51,10 +51,16 @@ export default function App() {
   }, [])
 
   const packaged = backend.state === 'ok' && backend.info.packaged === true
-  useEffect(() => (packaged ? startHeartbeat() : undefined), [packaged])
+  const [serverDown, setServerDown] = useState(false)
+  useEffect(() => (packaged ? startHeartbeat(10000, setServerDown) : undefined), [packaged])
 
   return (
     <div className="app">
+      {serverDown && (
+        <div className="server-down-banner" role="alert">
+          POKKER se cerró. Abrilo de nuevo desde el ícono o con doble clic en POKKER.exe.
+        </div>
+      )}
       <header className="app-header">
         <h1>Poker Study</h1>
         <p className="subtitle">Herramienta de estudio post-sesión. Sin asistencia en tiempo real.</p>
