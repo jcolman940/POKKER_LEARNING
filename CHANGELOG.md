@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.8.0] - 2026-10-10
+
+### Cambiado
+- **Nuevo diseño "Paño y oro":** toda la app pasa a un tema oscuro verde de mesa con detalles dorados, con mejor contraste y una tipografía más clara.
+- **Menú lateral agrupado** en Estudiar (Preflop, Simulador, Push/Fold, Entrenador) y Analizar (Manos, Replayer, Estadísticas, Solver). Se puede plegar a solo íconos y recuerda cómo lo dejaste. "Rangos preflop" ahora se llama **Preflop** e "Historiales" se llama **Manos**.
+- **Preflop:** primero elegís los filtros (juego, fuente, stake y jugadores, con cuántos rangos hay de cada uno) y después ves el visor con secuencia, posición, rival, stack efectivo, la matriz con la leyenda y el % del rango y combos. Desde el visor podés copiar el rango, editarlo, crear uno nuevo, abrir el spot en el Simulador o entrenarlo. Importar, exportar y la tabla de rangos están en "Importar / exportar".
+- **Simulador con mesa ovalada:** vos siempre abajo y los asientos según 6-max o 9-max. Tocando un asiento marcás rival, fold o vacío, la apuesta (⅓, ½, ⅔, Pot, All-in), el stack, el rango y las cartas. El pozo, lo que pagás y la acción previa se calculan solos a partir de la mesa, y la mesa se guarda entre sesiones. Las opciones avanzadas (situación, antes, premios de ICM, solver) quedan en un panel desplegable.
+
+### Corregido
+- Los checkboxes del Entrenador quedaban encima de su texto.
+
 ## [0.7.0] - 2026-10-07
 
 ### Agregado
