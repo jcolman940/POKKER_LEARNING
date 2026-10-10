@@ -29,6 +29,9 @@ export interface PreflopViewerProps {
   onManage: () => void
   onOpenSimulator: (scenario: InitialScenario) => void
   onTrain: (filters: InitialFilters) => void
+  /** Selection to start from when the viewer mounts again (after editing or managing charts). */
+  initialSelection?: ViewerSelection
+  onSelectionChange?: (selection: ViewerSelection) => void
 }
 
 function cellText(chart: Chart, index: number): string[] {
@@ -44,6 +47,7 @@ function cellText(chart: Chart, index: number): string[] {
 
 export function PreflopViewer(props: PreflopViewerProps) {
   const { charts, filters, onChangeFilters, onEdit, onCreate, onManage, onOpenSimulator, onTrain } = props
+  const { initialSelection = DEFAULT_SELECTION, onSelectionChange } = props
   const visible = useMemo(() => applyFilters(charts, filters), [charts, filters])
 
   const [positions, setPositions] = useState<string[]>([])
@@ -58,7 +62,7 @@ export function PreflopViewer(props: PreflopViewerProps) {
     return () => controller.abort()
   }, [filters.players])
 
-  const [wanted, setWanted] = useState<ViewerSelection>(DEFAULT_SELECTION)
+  const [wanted, setWanted] = useState<ViewerSelection>(initialSelection)
   const [pickedId, setPickedId] = useState<number | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -69,7 +73,9 @@ export function PreflopViewer(props: PreflopViewerProps) {
   const chart = matches.find((c) => c.id === pickedId) ?? matches[0] ?? null
 
   function change(patch: Partial<ViewerSelection>) {
-    setWanted({ ...sel, ...patch })
+    const next = { ...sel, ...patch }
+    setWanted(next)
+    onSelectionChange?.(next)
     setPickedId(null)
     setNote(null)
   }

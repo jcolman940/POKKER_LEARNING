@@ -104,6 +104,27 @@ describe('PreflopPage', () => {
     expect(await screen.findByText(/No hay un rango para/)).toBeInTheDocument()
   })
 
+  it('keeps the viewer selection after managing or editing charts', async () => {
+    mockApi({
+      'GET /api/charts': () => ({
+        json: [makeChart({ name: 'BTN open', position: 'BTN' }), makeChart({ name: 'CO open', position: 'CO' })],
+      }),
+      'GET /api/simulator/positions': () => ({ json: POSITIONS }),
+    })
+    window.localStorage.setItem(KEY, JSON.stringify({ format: 'cash', source: 'all', rake: 'all', players: 6 }))
+    render(<PreflopPage onOpenSimulator={noop} onTrain={noop} />)
+    fireEvent.click(await screen.findByRole('radio', { name: 'CO' }))
+    expect(screen.getByRole('group', { name: 'Rango CO open' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Importar \/ exportar/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al visor' }))
+    expect(screen.getByRole('group', { name: 'Rango CO open' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Editar/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByRole('group', { name: 'Rango CO open' })).toBeInTheDocument()
+  })
+
   it('manages charts: table with edit, import and back to the viewer', async () => {
     const imported: unknown[] = []
     mockApi({

@@ -8,7 +8,7 @@ import { ChartManager } from './ChartManager'
 import { exportCharts, importCharts } from './chartsApi'
 import { PreflopFiltersStep } from './PreflopFiltersStep'
 import { defaultFilters, isPreflopFilters, PREFLOP_FILTERS_KEY, type PreflopFilters } from './preflopFilters'
-import { NEW_CHART } from './preflopSelection'
+import { DEFAULT_SELECTION, NEW_CHART, type ViewerSelection } from './preflopSelection'
 import { PreflopViewer } from './PreflopViewer'
 import type { Chart, ChartData } from './types'
 import './preflop.css'
@@ -31,6 +31,8 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
   const [step, setStep] = useState<'filters' | 'viewer'>(() => (filters ? 'viewer' : 'filters'))
   const [editing, setEditing] = useState<Editing>(null)
   const [managing, setManaging] = useState(false)
+  // Lives here so the viewer comes back to the same spot after editing or managing charts.
+  const [selection, setSelection] = useState<ViewerSelection>(DEFAULT_SELECTION)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -154,6 +156,8 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
           onManage={() => setManaging(true)}
           onOpenSimulator={onOpenSimulator}
           onTrain={onTrain}
+          initialSelection={selection}
+          onSelectionChange={setSelection}
         />
       )}
     </div>

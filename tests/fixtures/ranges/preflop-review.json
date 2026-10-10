@@ -1,0 +1,45 @@
+{
+  "format": "poker-study-ranges",
+  "version": 1,
+  "charts": [
+    {
+      "name": "BTN RFI 100bb (Pokalab)", "source": "pokalab", "game_format": "cash", "players": 6,
+      "position": "BTN", "vs_position": null, "stack_bb": 100, "situation": "rfi", "open_size_bb": 2.5,
+      "rake": "GG NL50", "ante_bb": 0, "note": "",
+      "actions": { "raise": "22+,A2s+,K5s+,Q8s+,J8s+,T8s+,97s+,86s+,75s+,65s,54s,A8o+,KTo+,QTo+,JTo,A5o-A2o:0.5" }
+    },
+    {
+      "name": "CO RFI 100bb", "source": "pokalab", "game_format": "cash", "players": 6,
+      "position": "CO", "vs_position": null, "stack_bb": 100, "situation": "rfi", "open_size_bb": 2.5,
+      "rake": "GG NL50", "ante_bb": 0, "note": "",
+      "actions": { "raise": "33+,A2s+,K8s+,Q9s+,J9s+,T9s,98s,87s,76s,A9o+,KJo+,QJo" }
+    },
+    {
+      "name": "BTN RFI 100bb (propio)", "source": "custom", "game_format": "cash", "players": 6,
+      "position": "BTN", "vs_position": null, "stack_bb": 100, "situation": "rfi", "open_size_bb": 2.5,
+      "rake": null, "ante_bb": 0, "note": "",
+      "actions": { "raise": "22+,A2s+,K2s+,Q6s+,J7s+,T7s+,96s+,85s+,75s+,64s+,54s,A2o+,K9o+,Q9o+,J9o+,T9o" }
+    },
+    {
+      "name": "BB vs BTN open 100bb", "source": "pokalab", "game_format": "cash", "players": 6,
+      "position": "BB", "vs_position": "BTN", "stack_bb": 100, "situation": "vs_open", "open_size_bb": null,
+      "rake": "GG NL50", "ante_bb": 0, "note": "",
+      "actions": {
+        "call": "22-99,A6s-AJs,A3s-A2s,A5s-A4s:0.5,K2s+,Q5s+,J7s+,T7s+,96s+,85s+,75s+,64s+,54s,A2o-AJo,K9o+,Q9o+,J9o+,T9o",
+        "3bet": "TT+,AQs+,AQo+,A5s-A4s:0.5"
+      }
+    },
+    {
+      "name": "BTN RFI 40bb", "source": "pokalab", "game_format": "cash", "players": 6,
+      "position": "BTN", "vs_position": null, "stack_bb": 40, "situation": "rfi", "open_size_bb": 2.0,
+      "rake": null, "ante_bb": 0, "note": "",
+      "actions": { "raise": "22+,A2s+,K7s+,Q9s+,J9s+,T9s,98s,A7o+,KTo+,QJo" }
+    },
+    {
+      "name": "UTG RFI 25bb MTT", "source": "computed", "game_format": "mtt", "players": 9,
+      "position": "UTG", "vs_position": null, "stack_bb": 25, "situation": "rfi", "open_size_bb": 2.0,
+      "rake": null, "ante_bb": 0, "note": "",
+      "actions": { "raise": "77+,ATs+,KQs,AJo+" }
+    }
+  ]
+}
