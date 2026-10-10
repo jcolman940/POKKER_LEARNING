@@ -11,6 +11,7 @@ import { PostflopSolverFields } from './PostflopSolverFields'
 import { ResultsPanel } from './ResultsPanel'
 import { SeatPopover } from './SeatPopover'
 import {
+  applyDefaultStack,
   BOARD_CARDS,
   boardForStreet,
   defaultTable,
@@ -72,6 +73,9 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
 
   useEffect(() => writeStored(SIM_TABLE_KEY, table), [table])
 
+  // Table size whose positions already arrived; until then the seats may be from another size.
+  const [positionsFor, setPositionsFor] = useState<number | null>(null)
+
   useEffect(() => {
     fetchSolverStatus()
       .then((s) => setPresets(s.presets))
@@ -80,8 +84,10 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
 
   useEffect(() => {
     const controller = new AbortController()
-    getJson<string[]>(`/api/simulator/positions/${table.num_players}`, controller.signal)
-      .then((names) =>
+    const players = table.num_players
+    getJson<string[]>(`/api/simulator/positions/${players}`, controller.signal)
+      .then((names) => {
+        setPositionsFor(players)
         setTable((t) => ({
           ...t,
           seats: seatsFor(
@@ -89,16 +95,22 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
             t.seats.filter((s) => names.includes(s.position)),
             heroSeat(t.seats)?.stack_bb ?? 100,
           ),
-        })),
-      )
+        }))
+      })
       .catch(() => {
         // Without the position list the table keeps the seats it has.
+        if (!controller.signal.aborted) setPositionsFor(players)
       })
     return () => controller.abort()
   }, [table.num_players])
 
   const used = useMemo(
-    () => new Set([table.hero_hand, table.board, ...table.seats.map((s) => s.hand ?? '')].join('').match(/.{2}/g) ?? []),
+    () =>
+      new Set(
+        [table.hero_hand, boardForStreet(table.board, table.street), ...table.seats.map((s) => s.hand ?? '')]
+          .join('')
+          .match(/.{2}/g) ?? [],
+      ),
     [table],
   )
 
@@ -152,10 +164,11 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
     }
   }
 
-  const problem = validateTable(table)
+  const problem =
+    positionsFor === table.num_players ? validateTable(table) : 'Cargando las posiciones de la mesa…'
 
   async function analyze() {
-    if (validateTable(table)) return
+    if (problem) return
     setError(null)
     setBusy(true)
     try {
@@ -269,8 +282,12 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
                   step="1"
                   value={hero?.stack_bb ?? 100}
                   onChange={(e) => {
-                    const stack = Math.max(0, Number(e.target.value) || 0)
-                    setTable((t) => ({ ...t, seats: t.seats.map((s) => ({ ...s, stack_bb: stack })) }))
+                    const next = Number(e.target.value)
+                    if (!(next > 0)) return // an empty or zero field never wipes the stacks
+                    setTable((t) => ({
+                      ...t,
+                      seats: applyDefaultStack(t.seats, heroSeat(t.seats)?.stack_bb ?? 100, next),
+                    }))
                   }}
                 />
               </label>

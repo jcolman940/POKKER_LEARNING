@@ -76,9 +76,10 @@ describe('SimulatorPage', () => {
     expect(within(picker2).getByRole('button', { name: 'A de corazones' })).toBeDisabled()
   })
 
-  it('keeps Analizar disabled with the reason until the table is complete', () => {
+  it('keeps Analizar disabled with the reason until the table is complete', async () => {
     baseRoutes()
     render(<SimulatorPage />)
+    await screen.findByRole('button', { name: /^LJ · Fold/ })
     expect(screen.getByRole('button', { name: 'Analizar' })).toBeDisabled()
     expect(screen.getByText('Elegí tus dos cartas (o repartí al azar).')).toBeInTheDocument()
   })
@@ -178,6 +179,64 @@ describe('SimulatorPage', () => {
     render(<SimulatorPage />)
     expect(await screen.findByRole('button', { name: /^UTG\+2 · Fold/ })).toBeInTheDocument()
     expect(screen.getByText(/Torneo \(MTT\) · 9-max/)).toBeInTheDocument()
+  })
+
+  it('keeps the seat popover open while you pick the rival cards', async () => {
+    baseRoutes()
+    render(<SimulatorPage />)
+    await screen.findByRole('button', { name: /^LJ · Fold/ })
+    fireEvent.click(seatButton(/^BB · Rival/))
+    fireEvent.click(screen.getByRole('button', { name: 'BB carta 1: vacía' }))
+    const picker = screen.getByRole('dialog', { name: 'Elegir carta' })
+    const ace = within(picker).getByRole('button', { name: 'A de corazones' })
+    fireEvent.mouseDown(ace)
+    fireEvent.click(ace)
+    expect(screen.getByRole('dialog', { name: 'Asiento BB' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'BB carta 1: A de corazones' })).toBeInTheDocument()
+  })
+
+  it('does not block board cards that are not in play on this street', async () => {
+    baseRoutes()
+    window.localStorage.setItem(
+      'pokker.simulator.table',
+      JSON.stringify({
+        format: 'cash', num_players: 6, street: 'flop', pot_bb: 6.5, board: 'Kh7c2d9s', hero_hand: '',
+        seats: [
+          { position: 'BTN', role: 'hero', bet_bb: 0, stack_bb: 100, range: 'random', hand: null },
+          { position: 'BB', role: 'villain', bet_bb: 0, stack_bb: 100, range: 'random', hand: null },
+        ],
+        advanced: { ante_bb: 0, bb_ante_bb: 0, payouts: [], hero_range: '', ranges_approximate: false, solver_preset: 'chico', situation: null, previous_action: '' },
+      }),
+    )
+    render(<SimulatorPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Hero carta 1: vacía' }))
+    const picker = screen.getByRole('dialog', { name: 'Elegir carta' })
+    expect(within(picker).getByRole('button', { name: '9 de picas' })).toBeEnabled()
+    expect(within(picker).getByRole('button', { name: 'K de corazones' })).toBeDisabled()
+  })
+
+  it('waits for the table positions before analyzing', () => {
+    baseRoutes()
+    render(<SimulatorPage />)
+    expect(screen.getByRole('button', { name: 'Analizar' })).toBeDisabled()
+    expect(screen.getByText('Cargando las posiciones de la mesa…')).toBeInTheDocument()
+  })
+
+  it('the default stack ignores an empty value and keeps stacks you changed', async () => {
+    baseRoutes()
+    render(<SimulatorPage />)
+    await screen.findByRole('button', { name: /^LJ · Fold/ })
+    fireEvent.click(seatButton(/^BB · Rival/))
+    fireEvent.change(within(screen.getByRole('dialog', { name: 'Asiento BB' })).getByLabelText('Stack (bb)'), {
+      target: { value: '37' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar' }))
+    const stack = screen.getByLabelText('Stack efectivo por defecto (bb)')
+    fireEvent.change(stack, { target: { value: '' } })
+    expect(seatButton(/^BTN · Vos · 100 bb/)).toBeInTheDocument()
+    fireEvent.change(stack, { target: { value: '40' } })
+    expect(seatButton(/^BTN · Vos · 40 bb/)).toBeInTheDocument()
+    expect(seatButton(/^BB · Rival · 37 bb/)).toBeInTheDocument()
   })
 
   it('shows API validation errors in Spanish', async () => {

@@ -32,6 +32,8 @@ export function Popover({ open, onClose, anchorRef, label, className, children }
     function onMouseDown(e: MouseEvent) {
       const target = e.target as Node
       if (ref.current?.contains(target) || anchorRef.current?.contains(target)) return
+      // Panels that work with the popover (e.g. the card picker) mark themselves to keep it open.
+      if (target instanceof Element && target.closest('[data-popover-keep]')) return
       onCloseRef.current()
     }
     document.addEventListener('mousedown', onMouseDown)

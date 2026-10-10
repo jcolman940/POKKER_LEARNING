@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeTable, seat } from '../test/tables'
 import {
+  applyDefaultStack,
   BOARD_CARDS,
   boardForStreet,
   defaultTable,
@@ -162,7 +163,7 @@ describe('tableToScenario', () => {
     const s = tableToScenario(t)
     expect(s.pot_bb).toBe(22.5)
     expect(s.to_call_bb).toBe(8)
-    expect(s.previous_action).toBe('CO bet 12, BB call 4')
+    expect(s.previous_action).toBe('BB bet 4, CO raise 12') // postflop order starts at SB
   })
 
   it('caps what you face at what you have left after your own bet', () => {
@@ -187,6 +188,14 @@ describe('tableToScenario', () => {
     expect(previousActionFrom(t)).toBe('CO bet 4, BTN call 2')
   })
 
+  it('after the flop the action starts at the small blind', () => {
+    const t = makeTable({
+      seats: [seat('LJ'), seat('HJ'), seat('CO'), seat('BTN', 'villain', { bet_bb: 12 }), seat('SB'), seat('BB', 'hero', { bet_bb: 4 })],
+    })
+    expect(previousActionFrom(t)).toBe('BB bet 4, BTN raise 12')
+    expect(previousActionFrom({ ...t, street: 'preflop', board: '' })).toBe('BTN raise 12, BB call 4')
+  })
+
   it('opens with raise preflop and prefers the text typed by hand', () => {
     const t = makeTable({ street: 'preflop', board: '', seats: [seat('CO', 'villain', { bet_bb: 2.5 }), seat('BTN', 'hero')] })
     expect(previousActionFrom(t)).toBe('CO raise 2.5')
@@ -196,14 +205,20 @@ describe('tableToScenario', () => {
 
   it('sends stacks and payouts only in tournaments', () => {
     const t = makeTable({ format: 'mtt' })
+    t.seats = updateSeat(t.seats, 'CO', { stack_bb: 25 })
     t.advanced = { ...t.advanced, payouts: [50, 30, 20] }
     const s = tableToScenario(t)
-    expect(s.stacks_bb).toMatchObject({ BTN: 100, BB: 100, CO: 100 })
+    expect(s.stacks_bb).toMatchObject({ BTN: 100, BB: 100, CO: 25 })
     expect(s.payouts).toEqual([50, 30, 20])
+  })
+
+  it('leaves per-seat stacks out when nobody changed them, so push/fold can warn', () => {
+    expect(tableToScenario(makeTable({ format: 'mtt' })).stacks_bb).toEqual({})
   })
 
   it('ignores empty seats in pot and stacks', () => {
     const t = makeTable({ format: 'mtt' })
+    t.seats = updateSeat(t.seats, 'CO', { stack_bb: 25 })
     t.seats = updateSeat(t.seats, 'LJ', { role: 'empty', bet_bb: 5 })
     const s = tableToScenario(t)
     expect(s.pot_bb).toBe(6.5)
@@ -244,6 +259,14 @@ describe('validateTable', () => {
     expect(validateTable({ ...bbVsTwo(), hero_hand: 'Ah' })).toMatch(/tus dos cartas/)
     expect(validateTable({ ...bbVsTwo(), street: 'turn' })).toBe('Faltan cartas del board: el turn lleva 4.')
     expect(validateTable({ ...bbVsTwo(), street: 'preflop', board: '' })).toBeNull()
+  })
+
+  it('rejects an empty stack on any seat in play', () => {
+    const t = bbVsTwo()
+    expect(validateTable({ ...t, seats: updateSeat(t.seats, 'SB', { stack_bb: 0 }) })).toBe(
+      'El stack de SB tiene que ser mayor que 0.',
+    )
+    expect(validateTable({ ...t, seats: updateSeat(t.seats, 'SB', { stack_bb: 0, role: 'empty' }) })).toBeNull()
   })
 
   it('rejects a bet bigger than the stack', () => {
@@ -350,7 +373,22 @@ describe('tableFromInitial', () => {
   })
 })
 
+describe('applyDefaultStack', () => {
+  it('only moves the seats that still had the old default', () => {
+    const seats = [seat('BTN', 'hero'), seat('BB', 'villain', { stack_bb: 37 })]
+    expect(applyDefaultStack(seats, 100, 40).map((s) => s.stack_bb)).toEqual([40, 37])
+  })
+})
+
 describe('isTableState', () => {
+  it('rejects out-of-range players, non-numeric payouts and tables without seats', () => {
+    const t = defaultTable(null)
+    expect(isTableState({ ...t, num_players: 11 })).toBe(false)
+    expect(isTableState({ ...t, num_players: 1 })).toBe(false)
+    expect(isTableState({ ...t, seats: [] })).toBe(false)
+    expect(isTableState({ ...t, advanced: { ...t.advanced, payouts: ['50'] } })).toBe(false)
+  })
+
   it('accepts a real table and rejects corrupt or older shapes', () => {
     expect(isTableState(defaultTable(null))).toBe(true)
     expect(isTableState(JSON.parse(JSON.stringify(defaultTable(null))))).toBe(true)

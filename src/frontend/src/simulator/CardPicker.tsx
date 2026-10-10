@@ -10,7 +10,7 @@ interface Props {
 
 export function CardPicker({ used, onPick, onClear, onClose }: Props) {
   return (
-    <div className="card-picker" role="dialog" aria-label="Elegir carta">
+    <div className="card-picker" role="dialog" aria-label="Elegir carta" data-popover-keep>
       {SUITS.map((suit) => (
         <div key={suit} className="card-picker-row">
           {RANKS.map((rank) => {

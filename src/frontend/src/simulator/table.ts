@@ -138,9 +138,12 @@ export function presetBet(t: TableState, position: string, preset: BetPreset): n
 export function previousActionFrom(t: TableState): string {
   const typed = t.advanced.previous_action.trim()
   if (typed) return typed
+  // Preflop the action runs in table order (UTG … BB); after the flop it starts at the small blind.
+  const sb = t.street === 'preflop' ? -1 : t.seats.findIndex((s) => s.position === 'SB')
+  const order = sb > 0 ? [...t.seats.slice(sb), ...t.seats.slice(0, sb)] : t.seats
   let top = 0
   const parts: string[] = []
-  for (const s of t.seats) {
+  for (const s of order) {
     if (!inPlay(s) || s.bet_bb <= 0) continue
     const verb = top === 0 ? (t.street === 'preflop' ? 'raise' : 'bet') : s.bet_bb > top ? 'raise' : 'call'
     parts.push(`${s.position} ${verb} ${round2(s.bet_bb)}`)
@@ -169,7 +172,11 @@ export function tableToScenario(t: TableState): ScenarioInput {
     situation: t.advanced.situation,
     ante_bb: t.advanced.ante_bb,
     bb_ante_bb: t.advanced.bb_ante_bb,
-    stacks_bb: tournament ? Object.fromEntries(t.seats.filter(inPlay).map((s) => [s.position, behind(s)])) : {},
+    // Equal stacks mean nobody set them: send none, so the push/fold engine warns and uses the effective stack.
+    stacks_bb:
+      tournament && new Set(t.seats.filter(inPlay).map((s) => s.stack_bb)).size > 1
+        ? Object.fromEntries(t.seats.filter(inPlay).map((s) => [s.position, behind(s)]))
+        : {},
     payouts: tournament ? t.advanced.payouts : [],
     hero_range: t.advanced.hero_range || null,
     ranges_approximate: t.advanced.ranges_approximate,
@@ -189,9 +196,16 @@ export function validateTable(t: TableState): string | null {
   }
   const over = t.seats.find((s) => inPlay(s) && s.bet_bb > s.stack_bb)
   if (over) return `La apuesta de ${over.position} supera su stack.`
+  const broke = t.seats.find((s) => inPlay(s) && s.stack_bb <= 0)
+  if (broke) return `El stack de ${broke.position} tiene que ser mayor que 0.`
   const cards = [t.hero_hand, boardForStreet(t.board, t.street), ...villains.map((v) => v.hand ?? '')].join('').match(/.{2}/g) ?? []
   if (new Set(cards).size !== cards.length) return 'Hay cartas repetidas.'
   return null
+}
+
+/** Changing the default stack moves only the seats that still had the old default. */
+export function applyDefaultStack(seats: Seat[], previous: number, next: number): Seat[] {
+  return seats.map((s) => (s.stack_bb === previous ? { ...s, stack_bb: next } : s))
 }
 
 export const SIM_TABLE_KEY = 'pokker.simulator.table'
@@ -281,9 +295,13 @@ export function isTableState(v: unknown): v is TableState {
   return (
     FORMATS.includes(o.format as GameFormat) &&
     typeof o.num_players === 'number' &&
+    Number.isInteger(o.num_players) &&
+    o.num_players >= 2 &&
+    o.num_players <= 10 &&
     typeof o.street === 'string' &&
     o.street in BOARD_CARDS &&
     Array.isArray(o.seats) &&
+    o.seats.length > 0 &&
     o.seats.every(isSeat) &&
     typeof o.pot_bb === 'number' &&
     typeof o.board === 'string' &&
@@ -293,6 +311,7 @@ export function isTableState(v: unknown): v is TableState {
     typeof a.ante_bb === 'number' &&
     typeof a.bb_ante_bb === 'number' &&
     Array.isArray(a.payouts) &&
+    a.payouts.every((p) => typeof p === 'number') &&
     typeof a.hero_range === 'string' &&
     typeof a.ranges_approximate === 'boolean' &&
     typeof a.solver_preset === 'string' &&
