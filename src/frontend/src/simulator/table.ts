@@ -291,3 +291,12 @@ export function isTableState(v: unknown): v is TableState {
     typeof a.previous_action === 'string'
   )
 }
+
+/** Remaining prizes typed as "50, 30; 20": numbers split on commas, semicolons or spaces; junk dropped. */
+export function parsePayouts(text: string): number[] {
+  return text
+    .split(/[,;\s]+/)
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n >= 0)
+}
