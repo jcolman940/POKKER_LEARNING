@@ -172,11 +172,20 @@
 
 .sim-popover {
   top: 46px;
-  left: -95px;
+  left: -115px;
   width: 230px;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.sim-popover-anchor-right .sim-popover {
+  left: auto;
+  right: -50px;
+}
+
+.sim-popover-anchor-left .sim-popover {
+  left: -50px;
 }
 
 .sim-popover-title {

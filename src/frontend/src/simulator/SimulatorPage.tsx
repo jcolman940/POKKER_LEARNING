@@ -42,6 +42,12 @@ const MAX_PLAYERS = 10
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const storedFilters = (v: unknown): v is PreflopFilters | null => v === null || isPreflopFilters(v)
 
+/** Seats near the left or right edge open their popover towards the centre of the table. */
+function popoverSide(left: string): string {
+  const x = parseFloat(left)
+  return x > 62 ? ' sim-popover-anchor-right' : x < 38 ? ' sim-popover-anchor-left' : ''
+}
+
 function initialTable(initial?: InitialScenario): TableState {
   const base = defaultTable(readStored<PreflopFilters | null>(PREFLOP_FILTERS_KEY, null, storedFilters))
   if (initial) return tableFromInitial(initial, base)
@@ -289,7 +295,10 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
           onSlotClick={(slot) => setActive((a) => (sameSlot(a, slot) ? null : slot))}
           onPotChange={(pot_bb) => setTable((t) => ({ ...t, pot_bb }))}
           renderSeatPanel={(seat, anchorRef, style) => (
-            <div className="sim-popover-anchor" style={style}>
+            <div
+              className={`sim-popover-anchor${popoverSide(style.left)}`}
+              style={style}
+            >
               <SeatPopover
                 seat={seat}
                 table={table}
