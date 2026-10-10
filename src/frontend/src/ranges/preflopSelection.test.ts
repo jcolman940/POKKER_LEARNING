@@ -46,6 +46,17 @@ describe('viewerOptions', () => {
     expect(o.vsPositions.map((v) => v.value)).toEqual(['CO', 'BTN'])
   })
 
+  it('adds a "Sin rival" option when charts without rival sit next to charts with one', () => {
+    const charts = [
+      makeChart({ situation: 'vs_allin', position: 'BB', vs_position: 'BTN' }),
+      makeChart({ situation: 'vs_allin', position: 'BB', vs_position: null }),
+    ]
+    const sel = { situation: 'vs_allin', position: 'BB', vsPosition: null, stack: 100 }
+    expect(viewerOptions(charts, SIX, sel).vsPositions.map((v) => v.label)).toEqual(['BTN', 'Sin rival'])
+    expect(resolveSelection(charts, SIX, sel).vsPosition).toBeNull()
+    expect(matchingCharts(charts, sel)).toHaveLength(1)
+  })
+
   it('falls back to the positions found in the charts when the endpoint list is empty', () => {
     const o = viewerOptions(CHARTS, [], DEFAULT_SELECTION)
     expect(o.positions.map((p) => p.value)).toEqual(['BTN', 'CO', 'BB'])

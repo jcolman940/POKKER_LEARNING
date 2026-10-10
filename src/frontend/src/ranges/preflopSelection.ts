@@ -10,6 +10,9 @@ export interface ViewerSelection {
   stack: number | null
 }
 
+/** Rival option for charts stored without vs_position when others in the same spot have one. */
+export const NO_RIVAL = '-'
+
 export const DEFAULT_SELECTION: ViewerSelection = { situation: 'rfi', position: 'BTN', vsPosition: null, stack: 100 }
 
 const SITUATION_TEXT: Record<string, string> = {
@@ -60,8 +63,12 @@ export function viewerOptions(charts: Chart[], positions: string[], sel: ViewerS
           (a, b) => order.indexOf(a) - order.indexOf(b),
         )
   const vsPositions = rivals.map((v) => ({ value: v, label: v }))
+  if (rivals.length > 0 && atPosition.some((c) => !c.vs_position)) {
+    vsPositions.push({ value: NO_RIVAL, label: 'Sin rival' })
+  }
 
-  const forStack = rivals.length === 0 ? atPosition : atPosition.filter((c) => c.vs_position === sel.vsPosition)
+  const forStack =
+    rivals.length === 0 ? atPosition : atPosition.filter((c) => (c.vs_position ?? null) === sel.vsPosition)
   const stacks = unique(forStack.map((c) => c.stack_bb)).sort((a, b) => a - b)
 
   return { situations, positions: positionOpts, vsPositions, stacks }
@@ -91,7 +98,10 @@ export function resolveSelection(charts: Chart[], positions: string[], sel: View
     o = viewerOptions(charts, positions, s)
   }
   if (o.vsPositions.length === 0) s.vsPosition = null
-  else if (!o.vsPositions.some((x) => x.value === s.vsPosition)) s.vsPosition = o.vsPositions[0].value
+  else if (!o.vsPositions.some((x) => x.value === (s.vsPosition ?? NO_RIVAL))) {
+    const first = o.vsPositions[0].value
+    s.vsPosition = first === NO_RIVAL ? null : first
+  }
   o = viewerOptions(charts, positions, s)
   if (o.stacks.length > 0 && (s.stack === null || !o.stacks.includes(s.stack))) s.stack = closest(o.stacks, s.stack)
   return s

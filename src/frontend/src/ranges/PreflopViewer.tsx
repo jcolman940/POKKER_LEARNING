@@ -11,6 +11,7 @@ import { applyFilters, filtersSummary, type PreflopFilters } from './preflopFilt
 import {
   DEFAULT_SELECTION,
   draftFor,
+  NO_RIVAL,
   matchingCharts,
   resolveSelection,
   situationText,
@@ -156,8 +157,8 @@ export function PreflopViewer(props: PreflopViewerProps) {
             <PillGroup
               legend="Rival"
               options={options.vsPositions}
-              value={sel.vsPosition}
-              onChange={(vsPosition) => change({ vsPosition })}
+              value={sel.vsPosition ?? NO_RIVAL}
+              onChange={(v) => change({ vsPosition: v === NO_RIVAL ? null : v })}
             />
           )}
           {matches.length > 1 && chart && (
@@ -192,6 +193,7 @@ export function PreflopViewer(props: PreflopViewerProps) {
                 </li>
               </ul>
               <RangeMatrix layers={layers} caption={`Rango ${chart.name}`} onHover={setHover} />
+              {chart.note && <p className="muted small">{chart.note}</p>}
             </>
           ) : (
             <div className="panel preflop-missing">
@@ -226,6 +228,10 @@ export function PreflopViewer(props: PreflopViewerProps) {
                   hero_position: sel.position,
                   effective_stack_bb: sel.stack ?? 100,
                   situation: sel.situation,
+                  // The chart's rival; in RFI the big blind defends (small blind if you are the BB).
+                  villains: [
+                    { position: sel.vsPosition ?? (sel.position === 'BB' ? 'SB' : 'BB'), range: 'random', hand: null },
+                  ],
                 })
               }
             >

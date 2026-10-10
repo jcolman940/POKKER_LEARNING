@@ -123,6 +123,8 @@ describe('PreflopViewer', () => {
       hero_position: 'CO',
       effective_stack_bb: 40,
       situation: 'rfi',
+      // RFI has no rival in the chart: the big blind defends
+      villains: [{ position: 'BB', range: 'random', hand: null }],
     })
     fireEvent.click(screen.getByRole('button', { name: /Entrenar este spot/ }))
     expect(props.onTrain).toHaveBeenCalledWith({
@@ -131,6 +133,33 @@ describe('PreflopViewer', () => {
       formats: ['cash'],
       sources: ['chart'],
     })
+  })
+
+  it('sends the rival of the chart to the simulator, never a copy of the hero seat', async () => {
+    mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
+    const props = setup([makeChart({ situation: 'vs_open', position: 'BB', vs_position: 'BTN' })])
+    await screen.findAllByRole('radio', { name: 'LJ' })
+    fireEvent.click(screen.getByRole('button', { name: /Abrir en Simulador/ }))
+    expect(props.onOpenSimulator).toHaveBeenCalledWith(
+      expect.objectContaining({ hero_position: 'BB', villains: [{ position: 'BTN', range: 'random', hand: null }] }),
+    )
+  })
+
+  it('shows the chart note under the matrix', async () => {
+    mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
+    setup([makeChart({ note: 'Open 2.5x, rake GG' })])
+    expect(screen.getByText('Open 2.5x, rake GG')).toBeInTheDocument()
+  })
+
+  it('reaches a chart without rival next to charts with one', async () => {
+    mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
+    setup([
+      makeChart({ name: 'BB vs BTN shove', situation: 'vs_allin', position: 'BB', vs_position: 'BTN' }),
+      makeChart({ name: 'BB vs shove (any)', situation: 'vs_allin', position: 'BB', vs_position: null }),
+    ])
+    const rival = screen.getByRole('group', { name: 'Rival' })
+    fireEvent.click(within(rival).getByRole('radio', { name: 'Sin rival' }))
+    expect(screen.getByRole('group', { name: 'Rango BB vs shove (any)' })).toBeInTheDocument()
   })
 
   it('copies the range as text, and reports when the clipboard is unavailable', async () => {
