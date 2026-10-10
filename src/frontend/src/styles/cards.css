@@ -1,0 +1,100 @@
+/* ---- Cards ---- */
+.card-slots,
+.outs-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 42px;
+  height: 56px;
+  padding: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  font-weight: 700;
+  background: var(--card-bg);
+}
+
+.card-empty {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.card-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.card-disabled {
+  opacity: 0.2;
+}
+
+.card-suit {
+  font-size: 1.1rem;
+}
+
+/* Four-colour deck */
+.suit-s {
+  color: var(--suit-s);
+}
+
+.suit-h {
+  color: var(--suit-h);
+}
+
+.suit-d {
+  color: var(--suit-d);
+}
+
+.suit-c {
+  color: var(--suit-c);
+}
+
+.card-picker {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.card-picker .card {
+  width: 34px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.card-picker-row {
+  display: flex;
+  gap: 3px;
+}
+
+.card-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.mini-cards {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.mini-cards .card {
+  width: 24px;
+  height: 32px;
+  font-size: 0.7rem;
+}
+
+.mini-cards .card-suit {
+  font-size: 0.75rem;
+}

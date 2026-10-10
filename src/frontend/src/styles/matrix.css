@@ -1,0 +1,96 @@
+/* ---- Range preview ---- */
+.range-summary {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.range-grid {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 420px;
+  font-size: 0.55rem;
+}
+
+.range-cell {
+  --w: 0;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) calc(var(--w) * 100%), var(--grid-empty));
+  color: var(--text);
+  overflow: hidden;
+}
+
+.range-cell-on {
+  color: var(--on-accent);
+}
+
+.range-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* ---- Range matrix (editor and viewer) ---- */
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 560px;
+  user-select: none;
+  touch-action: none;
+}
+
+.matrix-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  font-size: clamp(0.5rem, 1.6vw, 0.72rem);
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 0 2px var(--surface);
+  overflow: hidden;
+}
+
+.matrix-cell-on {
+  color: #ffffff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+.action-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.85rem;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* ---- Trainer ---- */
+.matrix-cell-highlight {
+  outline: 3px solid var(--text);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
+}

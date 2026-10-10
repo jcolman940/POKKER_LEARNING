@@ -1,0 +1,112 @@
+.trainer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.trainer-main,
+.trainer-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.trainer-group {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0 0 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.trainer-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trainer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.trainer-hand {
+  display: flex;
+  gap: 8px;
+}
+
+.trainer-hand .card {
+  width: 64px;
+  height: 88px;
+  font-size: 1.6rem;
+}
+
+.trainer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trainer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 96px;
+  justify-content: center;
+}
+
+.verdict-correct {
+  border-color: var(--accent);
+}
+
+.verdict-acceptable {
+  border-color: var(--warn);
+}
+
+.verdict-error {
+  border-color: var(--danger);
+}
+
+.verdict-correct .verdict {
+  color: var(--accent);
+}
+
+.verdict-acceptable .verdict {
+  color: var(--warn);
+}
+
+.verdict-error .verdict {
+  color: var(--danger);
+}
+
+.trainer-summary,
+.trainer-errors {
+  margin: 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 860px) {
+  .trainer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .trainer-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+    padding: 8px 0;
+    z-index: 5;
+    border-top: 1px solid var(--border);
+  }
+
+  .trainer-action {
+    flex: 1 1 0;
+  }
+}

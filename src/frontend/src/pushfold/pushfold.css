@@ -1,0 +1,16 @@
+.stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.tournament summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.tournament[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

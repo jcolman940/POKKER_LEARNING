@@ -1,0 +1,101 @@
+/* ---- Layout ---- */
+.simulator {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .simulator {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sim-config,
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sim-results {
+  position: sticky;
+  top: 16px;
+}
+
+/* ---- Results ---- */
+.big-number {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--accent);
+}
+
+.equity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.equity-table th,
+.equity-table td {
+  text-align: right;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.equity-table th:first-child {
+  text-align: left;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.metrics dt {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.metrics dd {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+}
+
+.badge {
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.badge-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.rec-actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rec-actions li {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 48px auto;
+  align-items: center;
+  gap: 8px;
+}

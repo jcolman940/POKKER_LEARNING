@@ -1,0 +1,30 @@
+.chart-editor,
+.charts-page,
+.pushfold {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.charts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.charts-table th,
+.charts-table td {
+  text-align: left;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.row-selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+}

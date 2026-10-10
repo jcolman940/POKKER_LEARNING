@@ -1,0 +1,12 @@
+/* Global stylesheet: imported once from main.tsx. Order = cascade order. */
+@import './tokens.css';
+@import './base.css';
+@import './cards.css';
+@import './matrix.css';
+@import '../simulator/simulator.css';
+@import '../ranges/ranges.css';
+@import '../pushfold/pushfold.css';
+@import '../solver/solver.css';
+@import '../history/history.css';
+@import '../stats/stats.css';
+@import '../trainer/trainer.css';

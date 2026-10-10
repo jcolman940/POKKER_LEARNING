@@ -1,0 +1,163 @@
+/* ---- History, replayer, stats ---- */
+.history,
+.stats-page,
+.replayer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.filter-bar input[type='number'] {
+  max-width: 90px;
+}
+
+.position-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin: 0;
+}
+
+.position-filter legend {
+  font-size: 0.85rem;
+  padding: 0 4px;
+}
+
+.hands-table,
+.metrics-table,
+.chart-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.hands-table th,
+.hands-table td,
+.metrics-table th,
+.metrics-table td,
+.chart-table th,
+.chart-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.positive {
+  color: var(--positive);
+}
+
+.negative {
+  color: var(--negative);
+}
+
+.excerpt {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.metric-low {
+  color: var(--muted);
+}
+
+.metric-flag {
+  font-weight: 700;
+}
+
+.ci-line {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+/* Replayer */
+.replay-board {
+  display: flex;
+  gap: 6px;
+  min-height: 56px;
+  align-items: center;
+}
+
+.replay-seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+
+.replay-seat {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-areas: 'pos name cards' 'stack bet result';
+  gap: 2px 6px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.seat-pos {
+  grid-area: pos;
+  font-weight: 700;
+}
+
+.seat-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.replay-seat .mini-cards {
+  grid-area: cards;
+}
+
+.seat-stack {
+  grid-area: stack;
+  color: var(--muted);
+}
+
+.seat-bet {
+  grid-area: bet;
+}
+
+.seat-result {
+  grid-area: result;
+  font-weight: 700;
+}
+
+.is-hero {
+  border-color: var(--accent);
+}
+
+.is-actor {
+  outline: 2px solid var(--accent);
+}
+
+.is-folded {
+  opacity: 0.45;
+}
+
+.replay-action {
+  font-weight: 600;
+  margin: 4px 0;
+}
