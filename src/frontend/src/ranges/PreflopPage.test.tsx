@@ -125,6 +125,22 @@ describe('PreflopPage', () => {
     expect(screen.getByRole('group', { name: 'Rango CO open' })).toBeInTheDocument()
   })
 
+  it('does not bring back "Rango guardado." after an unrelated edit is cancelled', async () => {
+    mockApi({
+      'GET /api/charts': () => ({ json: [makeChart({ id: 41, name: 'BTN open' })] }),
+      'GET /api/simulator/positions': () => ({ json: POSITIONS }),
+      'PUT /api/charts/41': (body) => ({ json: { ...(body as object), id: 41 } }),
+    })
+    window.localStorage.setItem(KEY, JSON.stringify({ format: 'cash', source: 'all', rake: 'all', players: 6 }))
+    render(<PreflopPage onOpenSimulator={noop} onTrain={noop} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(await screen.findByText('Rango guardado.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByText('Rango guardado.')).toBeNull()
+  })
+
   it('keeps the picked duplicate after managing charts, and clears old messages', async () => {
     mockApi({
       'GET /api/charts': () => ({

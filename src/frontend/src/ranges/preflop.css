@@ -104,3 +104,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Always mounted for screen readers; empty it keeps a fixed height instead of a blank paragraph margin. */
+.preflop-status {
+  margin: 0;
+  min-height: 1.4em;
+}

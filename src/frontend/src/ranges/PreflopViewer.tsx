@@ -3,7 +3,7 @@ import { getJson } from '../api/client'
 import { handClassName } from '../simulator/cards'
 import type { InitialScenario } from '../simulator/SimulatorPage'
 import type { GameFormat } from '../simulator/types'
-import type { InitialFilters } from '../trainer/types'
+import { type InitialFilters, TRAINER_POSITIONS } from '../trainer/types'
 import { Button, Card, Chip, PillGroup, SegmentList, Select, Stat } from '../ui'
 import { SOURCE_LABEL } from './labels'
 import { actionLabel, chartToText, formatPct, rangeStats } from './notation'
@@ -126,7 +126,7 @@ export function PreflopViewer(props: PreflopViewerProps) {
         </div>
       </div>
       {/* Always mounted so screen readers announce the text when it changes. */}
-      <p className="small" role="status">
+      <p className="small preflop-status" role="status">
         {note}
       </p>
 
@@ -249,7 +249,7 @@ export function PreflopViewer(props: PreflopViewerProps) {
               onClick={() =>
                 onTrain({
                   // A position the table does not list (e.g. "EP") would be an invisible trainer filter.
-                  ...(positions.includes(sel.position) ? { positions: [sel.position] } : {}),
+                  ...(TRAINER_POSITIONS.includes(sel.position) ? { positions: [sel.position] } : {}),
                   situations: [sel.situation],
                   formats: [filters.format],
                   sources: ['chart'],

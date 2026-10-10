@@ -170,6 +170,13 @@ describe('PreflopViewer', () => {
     expect(props.onTrain).toHaveBeenCalledWith({ situations: ['rfi'], formats: ['cash'], sources: ['chart'] })
   })
 
+  it('keeps the position filter for known positions even if the table positions did not load', () => {
+    mockApi({})
+    const props = setup([makeChart({ position: 'BTN' })])
+    fireEvent.click(screen.getByRole('button', { name: /Entrenar este spot/ }))
+    expect(props.onTrain).toHaveBeenCalledWith(expect.objectContaining({ positions: ['BTN'] }))
+  })
+
   it('buttons are named without their decorative icons', () => {
     mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
     setup()

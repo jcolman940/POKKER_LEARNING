@@ -1,5 +1,8 @@
 import type { Recommendation } from '../simulator/types'
 
+/** Positions the trainer can filter by. */
+export const TRAINER_POSITIONS = ['UTG', 'UTG+1', 'UTG+2', 'UTG+3', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
+
 export type TrainerSource = 'pushfold' | 'chart' | 'range'
 export type Mode = 'normal' | 'review' | 'frequent'
 

@@ -139,8 +139,10 @@ export function previousActionFrom(t: TableState): string {
   const typed = t.advanced.previous_action.trim()
   if (typed) return typed
   // Preflop the action runs in table order (UTG … BB); after the flop it starts at the small blind.
-  const sb = t.street === 'preflop' ? -1 : t.seats.findIndex((s) => s.position === 'SB')
-  const order = sb > 0 ? [...t.seats.slice(sb), ...t.seats.slice(0, sb)] : t.seats
+  // (heads-up there is no SB seat: the BB acts first postflop)
+  let first = t.street === 'preflop' ? -1 : t.seats.findIndex((s) => s.position === 'SB')
+  if (t.street !== 'preflop' && first < 0) first = t.seats.findIndex((s) => s.position === 'BB')
+  const order = first > 0 ? [...t.seats.slice(first), ...t.seats.slice(0, first)] : t.seats
   let top = 0
   const parts: string[] = []
   for (const s of order) {
@@ -150,6 +152,11 @@ export function previousActionFrom(t: TableState): string {
     top = Math.max(top, s.bet_bb)
   }
   return parts.join(', ')
+}
+
+function customStacks(t: TableState): boolean {
+  const playing = t.seats.filter(inPlay)
+  return new Set(playing.map((s) => s.stack_bb)).size > 1 || playing.some((s) => s.bet_bb > 0)
 }
 
 export function tableToScenario(t: TableState): ScenarioInput {
@@ -172,11 +179,9 @@ export function tableToScenario(t: TableState): ScenarioInput {
     situation: t.advanced.situation,
     ante_bb: t.advanced.ante_bb,
     bb_ante_bb: t.advanced.bb_ante_bb,
-    // Equal stacks mean nobody set them: send none, so the push/fold engine warns and uses the effective stack.
-    stacks_bb:
-      tournament && new Set(t.seats.filter(inPlay).map((s) => s.stack_bb)).size > 1
-        ? Object.fromEntries(t.seats.filter(inPlay).map((s) => [s.position, behind(s)]))
-        : {},
+    // Push/fold solves from the stacks at the start of the hand (bet included). Equal stacks and no bets
+    // mean nobody set them: send none, so the engine warns and assumes the effective stack.
+    stacks_bb: tournament && customStacks(t) ? Object.fromEntries(t.seats.filter(inPlay).map((s) => [s.position, s.stack_bb])) : {},
     payouts: tournament ? t.advanced.payouts : [],
     hero_range: t.advanced.hero_range || null,
     ranges_approximate: t.advanced.ranges_approximate,

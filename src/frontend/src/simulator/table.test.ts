@@ -196,6 +196,11 @@ describe('tableToScenario', () => {
     expect(previousActionFrom({ ...t, street: 'preflop', board: '' })).toBe('BTN raise 12, BB call 4')
   })
 
+  it('heads-up, the big blind acts first after the flop', () => {
+    const t = makeTable({ num_players: 2, seats: [seat('BTN', 'villain', { bet_bb: 12 }), seat('BB', 'hero', { bet_bb: 4 })] })
+    expect(previousActionFrom(t)).toBe('BB bet 4, BTN raise 12')
+  })
+
   it('opens with raise preflop and prefers the text typed by hand', () => {
     const t = makeTable({ street: 'preflop', board: '', seats: [seat('CO', 'villain', { bet_bb: 2.5 }), seat('BTN', 'hero')] })
     expect(previousActionFrom(t)).toBe('CO raise 2.5')
@@ -210,6 +215,16 @@ describe('tableToScenario', () => {
     const s = tableToScenario(t)
     expect(s.stacks_bb).toMatchObject({ BTN: 100, BB: 100, CO: 25 })
     expect(s.payouts).toEqual([50, 30, 20])
+  })
+
+  it('sends starting stacks (bet included) when someone has bet, e.g. a shove with equal stacks', () => {
+    const t = makeTable({
+      format: 'mtt',
+      street: 'preflop',
+      board: '',
+      seats: [seat('CO', 'villain', { stack_bb: 15, bet_bb: 15 }), seat('BTN', 'hero', { stack_bb: 15 }), seat('BB', 'folded', { stack_bb: 15 })],
+    })
+    expect(tableToScenario(t).stacks_bb).toEqual({ CO: 15, BTN: 15, BB: 15 })
   })
 
   it('leaves per-seat stacks out when nobody changed them, so push/fold can warn', () => {

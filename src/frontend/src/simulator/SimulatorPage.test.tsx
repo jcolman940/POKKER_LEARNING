@@ -195,6 +195,17 @@ describe('SimulatorPage', () => {
     expect(screen.getByRole('button', { name: 'BB carta 1: A de corazones' })).toBeInTheDocument()
   })
 
+  it('Escape in the card picker closes only the picker, not the seat popover', async () => {
+    baseRoutes()
+    render(<SimulatorPage />)
+    await screen.findByRole('button', { name: /^LJ · Fold/ })
+    fireEvent.click(seatButton(/^BB · Rival/))
+    fireEvent.click(screen.getByRole('button', { name: 'BB carta 1: vacía' }))
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Elegir carta' }), { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Elegir carta' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Asiento BB' })).toBeInTheDocument()
+  })
+
   it('does not block board cards that are not in play on this street', async () => {
     baseRoutes()
     window.localStorage.setItem(

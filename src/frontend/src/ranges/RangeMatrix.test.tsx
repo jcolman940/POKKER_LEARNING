@@ -47,6 +47,8 @@ describe('RangeMatrix colours and keyboard', () => {
     expect(onHover).toHaveBeenLastCalledWith(1)
     fireEvent.keyDown(cells[1], { key: 'ArrowDown' })
     expect(cells[14]).toHaveFocus()
+    fireEvent.blur(cells[14])
+    expect(onHover).toHaveBeenLastCalledWith(null)
   })
 })
 

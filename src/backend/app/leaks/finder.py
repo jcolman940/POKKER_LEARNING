@@ -218,9 +218,7 @@ def _analyze(session: Session, filters: StatsFilter):
     if not decisions:
         warnings.append(NO_DECISIONS)
     if skipped:
-        warnings.append(
-            f"Hay {skipped} decisiones sin tabla de referencia: cargalas en Preflop."
-        )
+        warnings.append(f"Hay {skipped} decisiones sin tabla de referencia: cargalas en Preflop.")
     if unresolved:
         warnings.append(f"{unresolved} decisiones de push/fold no se pudieron evaluar.")
     return accs, total_hands, get_settings().leaks_min_sample, warnings

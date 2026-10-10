@@ -139,11 +139,11 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
       {managing ? (
         <ChartManager
           charts={charts}
-          onEdit={(chart) => setEditing({ mode: 'edit', chart })}
+          onEdit={(chart) => go(() => setEditing({ mode: 'edit', chart }))}
           onDelete={(chart) => void remove(chart)}
           onImport={(file) => void importFile(file)}
           onExport={(onlyOwn) => void exportFile(onlyOwn)}
-          onNew={() => setEditing({ mode: 'new', draft: NEW_CHART })}
+          onNew={() => go(() => setEditing({ mode: 'new', draft: NEW_CHART }))}
           onClose={() => go(() => setManaging(false))}
         />
       ) : step === 'filters' || charts.length === 0 ? (
@@ -152,15 +152,15 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
           value={current}
           onApply={apply}
           onImport={(file) => void importFile(file)}
-          onCreate={() => setEditing({ mode: 'new', draft: NEW_CHART })}
+          onCreate={() => go(() => setEditing({ mode: 'new', draft: NEW_CHART }))}
         />
       ) : (
         <PreflopViewer
           charts={charts}
           filters={current}
           onChangeFilters={() => go(() => setStep('filters'))}
-          onEdit={(chart) => setEditing({ mode: 'edit', chart })}
-          onCreate={(draft) => setEditing({ mode: 'new', draft })}
+          onEdit={(chart) => go(() => setEditing({ mode: 'edit', chart }))}
+          onCreate={(draft) => go(() => setEditing({ mode: 'new', draft }))}
           onManage={() => go(() => setManaging(true))}
           onOpenSimulator={onOpenSimulator}
           onTrain={onTrain}

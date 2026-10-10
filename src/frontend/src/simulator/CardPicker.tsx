@@ -10,7 +10,19 @@ interface Props {
 
 export function CardPicker({ used, onPick, onClear, onClose }: Props) {
   return (
-    <div className="card-picker" role="dialog" aria-label="Elegir carta" data-popover-keep>
+    <div
+      className="card-picker"
+      role="dialog"
+      aria-label="Elegir carta"
+      data-popover-keep
+      onKeyDown={(e) => {
+        // Escape closes the picker only, not the seat popover it was opened from.
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          onClose()
+        }
+      }}
+    >
       {SUITS.map((suit) => (
         <div key={suit} className="card-picker-row">
           {RANKS.map((rank) => {

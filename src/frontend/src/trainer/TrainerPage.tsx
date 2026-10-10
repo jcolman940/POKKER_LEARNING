@@ -29,13 +29,13 @@ import type {
   Summary,
   TrainerSource,
 } from './types'
+import { TRAINER_POSITIONS } from './types'
 
 const SOURCE_OPTIONS: [TrainerSource, string][] = [
   ['pushfold', 'Push/fold'],
   ['chart', 'Tablas preflop'],
   ['range', 'Pintá tu rango'],
 ]
-const POSITIONS = ['UTG', 'UTG+1', 'UTG+2', 'UTG+3', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
 const BUCKETS = ['3-5', '6-8', '9-11', '12-15', '≤15', '16-30', '31-60', '61-120', '120+']
 const MODES: [Mode, string][] = [
   ['normal', 'Normal'],
@@ -334,7 +334,7 @@ export function TrainerPage({ initialFilters }: { initialFilters?: InitialFilter
               />
               <CheckGroup
                 legend="Posiciones"
-                options={POSITIONS.map((p) => [p, p] as const)}
+                options={TRAINER_POSITIONS.map((p) => [p, p] as const)}
                 value={filters.positions}
                 onChange={(positions) => set({ positions })}
               />

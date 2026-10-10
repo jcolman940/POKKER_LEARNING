@@ -111,6 +111,7 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
                       setFocusIndex(i)
                       onHover?.(i)
                     },
+                    onBlur: () => onHover?.(null),
                     onKeyDown: (e: KeyboardEvent<HTMLElement>) => moveFocus(e, i),
                   }
                 : {})}
