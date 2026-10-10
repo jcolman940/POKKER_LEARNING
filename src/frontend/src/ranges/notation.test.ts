@@ -30,6 +30,12 @@ describe('chartToText', () => {
   })
 })
 
+describe('chartToText and fold', () => {
+  it('leaves an explicit fold layer out, like the stats', () => {
+    expect(chartToText({ raise: grid({ 0: 1 }), fold: grid({ 14: 1 }) })).toBe('Raise: AA')
+  })
+})
+
 describe('rangeStats', () => {
   it('counts played combos and ignores explicit fold layers', () => {
     // AA = 6 combos; fold on KK must not count

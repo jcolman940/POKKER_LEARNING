@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { deleteJson, getJson, postJson, putJson } from '../api/client'
 import { readStored, writeStored } from '../app/storage'
 import type { InitialScenario } from '../simulator/SimulatorPage'
@@ -33,16 +33,24 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
   const [managing, setManaging] = useState(false)
   // Lives here so the viewer comes back to the same spot after editing or managing charts.
   const [selection, setSelection] = useState<ViewerSelection>(DEFAULT_SELECTION)
+  const [pickedId, setPickedId] = useState<number | null>(null)
+
+  /** Messages belong to the screen that produced them: moving on clears them. */
+  function go(next: () => void) {
+    setNotice(null)
+    setError(null)
+    next()
+  }
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const reload = useCallback(async () => {
+  async function reload() {
     try {
       setCharts(await getJson<Chart[]>('/api/charts'))
     } catch (e) {
       setError(message(e))
     }
-  }, [])
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -136,7 +144,7 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
           onImport={(file) => void importFile(file)}
           onExport={(onlyOwn) => void exportFile(onlyOwn)}
           onNew={() => setEditing({ mode: 'new', draft: NEW_CHART })}
-          onClose={() => setManaging(false)}
+          onClose={() => go(() => setManaging(false))}
         />
       ) : step === 'filters' || charts.length === 0 ? (
         <PreflopFiltersStep
@@ -150,13 +158,15 @@ export function PreflopPage({ onOpenSimulator, onTrain }: Props) {
         <PreflopViewer
           charts={charts}
           filters={current}
-          onChangeFilters={() => setStep('filters')}
+          onChangeFilters={() => go(() => setStep('filters'))}
           onEdit={(chart) => setEditing({ mode: 'edit', chart })}
           onCreate={(draft) => setEditing({ mode: 'new', draft })}
-          onManage={() => setManaging(true)}
+          onManage={() => go(() => setManaging(true))}
           onOpenSimulator={onOpenSimulator}
           onTrain={onTrain}
           initialSelection={selection}
+          initialPickedId={pickedId}
+          onPickedChange={setPickedId}
           onSelectionChange={setSelection}
         />
       )}

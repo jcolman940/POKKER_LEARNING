@@ -33,6 +33,9 @@ export interface PreflopViewerProps {
   /** Selection to start from when the viewer mounts again (after editing or managing charts). */
   initialSelection?: ViewerSelection
   onSelectionChange?: (selection: ViewerSelection) => void
+  /** Duplicate chart picked by hand, kept by the page like the selection. */
+  initialPickedId?: number | null
+  onPickedChange?: (id: number | null) => void
 }
 
 function cellText(chart: Chart, index: number): string[] {
@@ -48,7 +51,7 @@ function cellText(chart: Chart, index: number): string[] {
 
 export function PreflopViewer(props: PreflopViewerProps) {
   const { charts, filters, onChangeFilters, onEdit, onCreate, onManage, onOpenSimulator, onTrain } = props
-  const { initialSelection = DEFAULT_SELECTION, onSelectionChange } = props
+  const { initialSelection = DEFAULT_SELECTION, onSelectionChange, initialPickedId = null, onPickedChange } = props
   const visible = useMemo(() => applyFilters(charts, filters), [charts, filters])
 
   const [positions, setPositions] = useState<string[]>([])
@@ -64,7 +67,12 @@ export function PreflopViewer(props: PreflopViewerProps) {
   }, [filters.players])
 
   const [wanted, setWanted] = useState<ViewerSelection>(initialSelection)
-  const [pickedId, setPickedId] = useState<number | null>(null)
+  const [pickedId, setPickedIdState] = useState<number | null>(initialPickedId)
+  function setPickedId(id: number | null) {
+    setPickedIdState(id)
+    onPickedChange?.(id)
+    setNote(null)
+  }
   const [hover, setHover] = useState<number | null>(null)
   const [note, setNote] = useState<string | null>(null)
 
@@ -104,24 +112,23 @@ export function PreflopViewer(props: PreflopViewerProps) {
         </Chip>
         <div className="preflop-tools">
           <Button size="sm" disabled={!chart} onClick={() => void copy()}>
-            ⧉ Copiar rango
+            <span aria-hidden="true">⧉</span> Copiar rango
           </Button>
           <Button size="sm" disabled={!chart} onClick={() => chart && onEdit(chart)}>
-            ✎ Editar
+            <span aria-hidden="true">✎</span> Editar
           </Button>
           <Button size="sm" onClick={() => onCreate(draftFor(filters, sel))}>
-            ＋ Nuevo
+            <span aria-hidden="true">＋</span> Nuevo
           </Button>
           <Button size="sm" onClick={onManage}>
-            ⇅ Importar / exportar
+            <span aria-hidden="true">⇅</span> Importar / exportar
           </Button>
         </div>
       </div>
-      {note && (
-        <p className="small" role="status">
-          {note}
-        </p>
-      )}
+      {/* Always mounted so screen readers announce the text when it changes. */}
+      <p className="small" role="status">
+        {note}
+      </p>
 
       <div className="preflop-body">
         <aside className="preflop-left">
@@ -181,7 +188,7 @@ export function PreflopViewer(props: PreflopViewerProps) {
                   .filter(({ action }) => action !== 'fold')
                   .map(({ action, grid }) => (
                     <li key={action}>
-                      <span className="swatch" style={{ background: `var(--action-${action})` }} />
+                      <span className="swatch" style={{ background: `var(--action-${action}, var(--text-dim))` }} />
                       {actionLabel(action)}
                       <span className="preflop-legend-pct">{formatPct(rangeStats({ [action]: grid }).pct)}</span>
                     </li>
@@ -235,20 +242,21 @@ export function PreflopViewer(props: PreflopViewerProps) {
                 })
               }
             >
-              ⬭ Abrir en Simulador →
+              <span aria-hidden="true">⬭</span> Abrir en Simulador <span aria-hidden="true">→</span>
             </Button>
             <Button
               variant="ghost"
               onClick={() =>
                 onTrain({
-                  positions: [sel.position],
+                  // A position the table does not list (e.g. "EP") would be an invisible trainer filter.
+                  ...(positions.includes(sel.position) ? { positions: [sel.position] } : {}),
                   situations: [sel.situation],
                   formats: [filters.format],
                   sources: ['chart'],
                 })
               }
             >
-              ✎ Entrenar este spot →
+              <span aria-hidden="true">✎</span> Entrenar este spot <span aria-hidden="true">→</span>
             </Button>
           </Card>
         </aside>

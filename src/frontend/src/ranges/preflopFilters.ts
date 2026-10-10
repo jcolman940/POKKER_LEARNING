@@ -102,6 +102,7 @@ export function isPreflopFilters(v: unknown): v is PreflopFilters {
   const o = v as Record<string, unknown>
   return (
     typeof o.format === 'string' &&
+    FORMAT_LABELS.some(([v]) => v === o.format) &&
     typeof o.source === 'string' &&
     typeof o.rake === 'string' &&
     typeof o.players === 'number' &&

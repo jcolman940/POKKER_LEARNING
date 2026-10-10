@@ -87,6 +87,7 @@ describe('isPreflopFilters', () => {
     expect(isPreflopFilters({ format: 'cash' })).toBe(false)
     expect(isPreflopFilters(null)).toBe(false)
     expect(isPreflopFilters('cash')).toBe(false)
+    expect(isPreflopFilters({ ...CASH6, format: 'raro' })).toBe(false)
   })
 })
 

@@ -29,6 +29,27 @@ describe('RangeMatrix label colour', () => {
   })
 })
 
+describe('RangeMatrix colours and keyboard', () => {
+  it('falls back to a neutral colour for an unknown action', () => {
+    const { container } = render(<RangeMatrix layers={[{ action: 'minraise', grid: grid(1) }]} />)
+    expect((container.querySelector('.matrix-cell') as HTMLElement).style.background).toContain('var(--action-minraise, ')
+  })
+
+  it('read-only cells take one tab stop and move with the arrow keys, reporting the focused hand', () => {
+    const onHover = vi.fn()
+    const { container } = render(<RangeMatrix layers={[{ action: 'raise', grid: grid(1) }]} onHover={onHover} />)
+    const cells = [...container.querySelectorAll<HTMLElement>('.matrix-cell')]
+    expect(cells.filter((c) => c.tabIndex === 0)).toHaveLength(1)
+    cells[0].focus()
+    expect(onHover).toHaveBeenLastCalledWith(0)
+    fireEvent.keyDown(cells[0], { key: 'ArrowRight' })
+    expect(cells[1]).toHaveFocus()
+    expect(onHover).toHaveBeenLastCalledWith(1)
+    fireEvent.keyDown(cells[1], { key: 'ArrowDown' })
+    expect(cells[14]).toHaveFocus()
+  })
+})
+
 describe('RangeMatrix hover', () => {
   it('reports the hovered cell and null when leaving the matrix', () => {
     const onHover = vi.fn()

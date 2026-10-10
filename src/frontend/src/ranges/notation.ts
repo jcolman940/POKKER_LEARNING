@@ -19,6 +19,7 @@ export function actionLabel(action: string): string {
 /** One line per action that has hands: `Raise: AA,AKs:0.5`. */
 export function chartToText(actions: Record<string, number[]>): string {
   return Object.entries(actions)
+    .filter(([action]) => action !== 'fold') // the rest of each hand is fold anyway, as in the stats
     .map(([action, grid]) => [action, gridToNotation(grid)] as const)
     .filter(([, notation]) => notation !== '')
     .map(([action, notation]) => `${actionLabel(action)}: ${notation}`)

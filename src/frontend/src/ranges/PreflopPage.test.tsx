@@ -125,6 +125,29 @@ describe('PreflopPage', () => {
     expect(screen.getByRole('group', { name: 'Rango CO open' })).toBeInTheDocument()
   })
 
+  it('keeps the picked duplicate after managing charts, and clears old messages', async () => {
+    mockApi({
+      'GET /api/charts': () => ({
+        json: [
+          makeChart({ id: 31, name: 'Viejo', updated_at: '2026-10-01T00:00:00' }),
+          makeChart({ id: 32, name: 'Nuevo', source: 'custom', updated_at: '2026-10-05T00:00:00' }),
+        ],
+      }),
+      'GET /api/simulator/positions': () => ({ json: POSITIONS }),
+      'POST /api/charts/import': () => ({ json: { created: 1, errors: [] } }),
+    })
+    window.localStorage.setItem(KEY, JSON.stringify({ format: 'cash', source: 'all', rake: 'all', players: 6 }))
+    render(<PreflopPage onOpenSimulator={noop} onTrain={noop} />)
+    fireEvent.change(await screen.findByRole('combobox', { name: '2 rangos' }), { target: { value: '31' } })
+    fireEvent.click(screen.getByRole('button', { name: /Importar \/ exportar/ }))
+    const file = new File(['{"format":"poker-study-ranges","version":1,"charts":[]}'], 'set.json')
+    fireEvent.change(screen.getByLabelText('Importar set (.json)'), { target: { files: [file] } })
+    expect(await screen.findByText('Importados: 1.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al visor' }))
+    expect(screen.queryByText('Importados: 1.')).toBeNull()
+    expect(screen.getByRole('group', { name: 'Rango Viejo' })).toBeInTheDocument()
+  })
+
   it('manages charts: table with edit, import and back to the viewer', async () => {
     const imported: unknown[] = []
     mockApi({

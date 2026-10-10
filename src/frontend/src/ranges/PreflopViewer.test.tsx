@@ -162,6 +162,23 @@ describe('PreflopViewer', () => {
     expect(screen.getByRole('group', { name: 'Rango BB vs shove (any)' })).toBeInTheDocument()
   })
 
+  it('does not filter the trainer by a position the table does not have', async () => {
+    mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
+    const props = setup([makeChart({ position: 'EP' })])
+    await screen.findAllByRole('radio', { name: 'LJ' })
+    fireEvent.click(screen.getByRole('button', { name: /Entrenar este spot/ }))
+    expect(props.onTrain).toHaveBeenCalledWith({ situations: ['rfi'], formats: ['cash'], sources: ['chart'] })
+  })
+
+  it('buttons are named without their decorative icons', () => {
+    mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
+    setup()
+    for (const name of ['Copiar rango', 'Editar', 'Nuevo', 'Importar / exportar']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('status')).toBeInTheDocument()
+  })
+
   it('copies the range as text, and reports when the clipboard is unavailable', async () => {
     mockApi({ 'GET /api/simulator/positions/6': () => ({ json: SIX }) })
     const writeText = vi.fn().mockResolvedValue(undefined)

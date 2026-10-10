@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { handClassName } from '../simulator/cards'
 import { ACTION_LABEL } from './labels'
 
@@ -30,7 +30,8 @@ function background(layers: Layer[], i: number): string {
     const w = grid[i] ?? 0
     if (w <= 0) continue
     const end = Math.min(1, start + w)
-    const color = `var(--action-${action})`
+    // Unknown actions still get a colour, so the other actions in the cell keep theirs.
+    const color = `var(--action-${action}, var(--text-dim))`
     stops.push(`${color} ${start * 100}% ${end * 100}%`)
     start = end
   }
@@ -49,6 +50,19 @@ function describe(layers: Layer[], i: number, implicitFold: boolean): string {
 
 export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = true, highlight, onHover }: Props) {
   const painting = useRef(false)
+  const container = useRef<HTMLDivElement>(null)
+  // Read-only viewer: one tab stop for the whole matrix, arrows move between hands.
+  const keyboard = !onPaint && !!onHover
+  const [focusIndex, setFocusIndex] = useState(0)
+
+  function moveFocus(e: KeyboardEvent<HTMLElement>, i: number) {
+    const step = ({ ArrowRight: 1, ArrowLeft: -1, ArrowDown: 13, ArrowUp: -13 } as Record<string, number>)[e.key]
+    if (step === undefined) return
+    e.preventDefault()
+    const next = i + step
+    if (next < 0 || next > 168) return
+    ;(container.current?.children[next] as HTMLElement | undefined)?.focus()
+  }
 
   useEffect(() => {
     const stop = () => {
@@ -60,6 +74,7 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
 
   return (
     <div
+      ref={container}
       className="matrix"
       role="group"
       aria-label={caption ?? 'Matriz de rango 13×13'}
@@ -87,6 +102,18 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
               style={style}
               title={label}
               onPointerEnter={onHover ? () => onHover(i) : undefined}
+              {...(keyboard
+                ? {
+                    role: 'img',
+                    'aria-label': label,
+                    tabIndex: i === focusIndex ? 0 : -1,
+                    onFocus: () => {
+                      setFocusIndex(i)
+                      onHover?.(i)
+                    },
+                    onKeyDown: (e: KeyboardEvent<HTMLElement>) => moveFocus(e, i),
+                  }
+                : {})}
             >
               {handClassName(i)}
             </span>
