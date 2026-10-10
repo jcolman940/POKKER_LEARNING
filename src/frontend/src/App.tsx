@@ -26,10 +26,9 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(() => readStored(SIDEBAR_KEY, false, isBoolean))
 
   function toggleSidebar() {
-    setCollapsed((c) => {
-      writeStored(SIDEBAR_KEY, !c)
-      return !c
-    })
+    const next = !collapsed
+    setCollapsed(next)
+    writeStored(SIDEBAR_KEY, next) // outside the updater, so StrictMode does not write twice
   }
   const [handId, setHandId] = useState<number | null>(null)
   const [spot, setSpot] = useState<{ key: number; scenario: InitialScenario } | null>(null)

@@ -13,6 +13,7 @@
 .ui-chip-action,
 .ui-chip-action:hover:not(:disabled) {
   border: none;
+  filter: none;
   background: none;
   padding: 0;
   color: var(--gold);

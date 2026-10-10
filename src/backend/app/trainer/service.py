@@ -31,8 +31,8 @@ from app.trainer.srs import INITIAL_EASE, CardState, relearn_offset, schedule
 
 SOURCES = ("pushfold", "chart", "range")
 MODES = ("normal", "review", "frequent")
-CHART_HINT = "Cargá rangos en la sección Rangos preflop para entrenar con tus tablas."
-RANGE_HINT = "Cargá rangos en la sección Rangos preflop para practicar pintando."
+CHART_HINT = "Cargá rangos en la sección Preflop para entrenar con tus tablas."
+RANGE_HINT = "Cargá rangos en la sección Preflop para practicar pintando."
 
 
 class SpotNotFound(LookupError):

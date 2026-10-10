@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { Popover } from '.'
 
@@ -37,7 +37,37 @@ function EditingHarness() {
   )
 }
 
+function Bare({ children }: { children?: ReactNode }) {
+  const [open, setOpen] = useState(true)
+  const anchor = useRef<HTMLButtonElement>(null)
+  return (
+    <div>
+      <button ref={anchor} type="button">
+        ancla
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchor} label="Info">
+        {children ?? <p>solo texto</p>}
+      </Popover>
+    </div>
+  )
+}
+
 describe('Popover', () => {
+  it('closes on Escape even with nothing focusable inside', () => {
+    render(<Bare />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('focuses a link when it is the first control', () => {
+    render(
+      <Bare>
+        <a href="#ayuda">Ayuda</a>
+      </Bare>,
+    )
+    expect(screen.getByRole('link', { name: 'Ayuda' })).toHaveFocus()
+  })
+
   it('keeps focus where the user is typing when the parent re-renders', () => {
     render(<EditingHarness />)
     const stack = screen.getByRole('textbox', { name: 'Stack' })

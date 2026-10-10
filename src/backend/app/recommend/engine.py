@@ -133,7 +133,7 @@ def _recommend_chart(scenario: Scenario, session: Session, hand: str) -> Recomme
     if match is None:
         return unavailable(
             f"No hay rangos cargados para {scenario.hero_position} en esta situación. "
-            "Cargalos en la sección Rangos preflop."
+            "Cargalos en la sección Preflop."
         )
     return recommend_from_chart(match.chart, scenario, match.exact, match.mismatches)
 

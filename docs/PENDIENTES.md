@@ -1,21 +1,9 @@
 # Pendientes
 
-Detalles detectados en las revisiones finales de la fase 8 que quedaron sin resolver a propósito, más lo que sigue en la hoja de ruta. Cuando resuelvas uno, borralo de esta lista en el mismo commit.
+Lo que sigue en la hoja de ruta, y los detalles que las revisiones dejen pendientes. Cuando resuelvas uno, borralo de esta lista en el mismo commit.
 
 ## Hoja de ruta
 
 1. **Parsers de GGPoker y PokerStars:** esperan una historia de manos real de un torneo.
 2. **Diferidos del entrenador:** racha y meta diaria, y un explicador conversacional con LLM (spec fase 6 §9).
 3. **`POKKER.exe` en la raíz del repo:** quedó postergado. La complejidad es que el exe necesita las piezas armadas de `app\`, y el actualizador reescribiría archivos versionados. La idea preferida es un exe de arranque que instale y actualice la app en `%LOCALAPPDATA%`.
-
-## Fase 8, parte 1: base visual
-
-- **Vista previa de rangos del Simulador:** las celdas con peso entre 0,5 y 0,65 quedan con el texto a ~3,7:1 (la mezcla dorado/fondo es más oscura que el dorado puro).
-- **Backend:** el Entrenador todavía dice "sección Rangos preflop" en los motivos de las fuentes (texto del backend). La sección ahora se llama "Preflop".
-- **Título de la pestaña:** el navegador sigue mostrando "Poker Study" (`src/frontend/index.html`).
-- **Popover:** Escape no lo cierra si no tiene nada enfocable adentro.
-- **Popover:** `FOCUSABLE` no incluye los enlaces `a[href]`.
-- **Menú lateral:** `writeStored` se llama dentro del actualizador de `setCollapsed`, así que en StrictMode (desarrollo) escribe dos veces.
-- **Cortes de pantalla:** los de Simulador y Entrenador (860 y 640 px) no tienen en cuenta los 170 px del menú, así que entre unos 860 y 1030 px quedan apretados.
-- **Chip:** el "Cambiar" (`.ui-chip-action`) se aclara al pasar el mouse por el brillo global de los botones.
-- **Barras de frecuencias** (Recomendación y Entrenador): el segmento de fold casi no se ve sobre la superficie, porque fold usa el mismo color que una celda vacía, como pide el spec.

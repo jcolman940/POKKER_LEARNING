@@ -1,6 +1,6 @@
 import { ACTION_LABEL } from '../ranges/labels'
 import { RangeMatrix } from '../ranges/RangeMatrix'
-import { pct } from './format'
+import { barColor, pct } from './format'
 import type { Recommendation } from './types'
 
 const SOURCE_LABEL = {
@@ -37,7 +37,7 @@ export function RecommendationPanel({ rec }: { rec: Recommendation }) {
             <span className="rec-bar" aria-hidden="true">
               <span
                 className="rec-bar-fill"
-                style={{ width: `${a.frequency * 100}%`, background: `var(--action-${a.action})` }}
+                style={{ width: `${a.frequency * 100}%`, background: barColor(a.action) }}
               />
             </span>
             <span className="rec-freq">{pct(a.frequency, 0)}</span>

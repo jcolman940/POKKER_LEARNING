@@ -41,6 +41,8 @@
   --action-5bet: #c96a4f;
   --action-allin: #d4625a;
   --action-fold: #1a2e23;
+  /* Fold in frequency bars: must stand out from the card it sits on (fold cells stay --grid-empty). */
+  --action-fold-bar: #5a7566;
   --action-check: var(--action-call);
   --action-bet: var(--action-raise);
 

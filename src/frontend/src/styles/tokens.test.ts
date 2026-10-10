@@ -61,6 +61,11 @@ describe('Paño y oro tokens', () => {
     expect(contrastRatio(t[fg], t[bg])).toBeGreaterThanOrEqual(4.5)
   })
 
+  it('the fold segment of frequency bars is visible on cards (3:1 for non-text)', () => {
+    expect(t['--action-fold-bar'], '--action-fold-bar').toBeDefined()
+    expect(contrastRatio(t['--action-fold-bar'], t['--surface'])).toBeGreaterThanOrEqual(3)
+  })
+
   it('is dark-only (no light/dark media switch)', () => {
     expect(tokensCss).not.toContain('prefers-color-scheme')
   })

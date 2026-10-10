@@ -12,7 +12,7 @@ interface Props {
 }
 
 const FOCUSABLE =
-  'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea, [tabindex]:not([tabindex="-1"])'
+  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
 /** Floating panel next to its anchor. The caller positions it through className. */
 export function Popover({ open, onClose, anchorRef, label, className, children }: Props) {
@@ -36,9 +36,15 @@ export function Popover({ open, onClose, anchorRef, label, className, children }
       if (target instanceof Element && target.closest('[data-popover-keep]')) return
       onCloseRef.current()
     }
+    // Escape works even when focus never entered the panel (nothing focusable inside).
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCloseRef.current()
+    }
     document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
       anchor?.focus()
     }
   }, [open, anchorRef])

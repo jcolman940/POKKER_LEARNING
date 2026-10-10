@@ -21,11 +21,18 @@
   justify-content: center;
   background: color-mix(in srgb, var(--accent) calc(var(--w) * 100%), var(--grid-empty));
   color: var(--text-muted);
+  /* Partly weighted cells mix gold and the dark fill: a halo keeps the label readable on both. */
+  text-shadow:
+    0 0 3px var(--bg),
+    0 0 1px var(--bg);
   overflow: hidden;
 }
 
 .range-cell-on {
   color: var(--on-accent);
+  text-shadow:
+    0 0 3px rgb(255 255 255 / 0.6),
+    0 0 1px rgb(255 255 255 / 0.6);
 }
 
 .range-list {

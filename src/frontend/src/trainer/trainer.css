@@ -92,7 +92,8 @@
   padding-left: 18px;
 }
 
-@media (max-width: 860px) {
+/* 860 px of content plus the 170 px sidebar */
+@media (max-width: 1030px) {
   .trainer {
     grid-template-columns: minmax(0, 1fr);
   }

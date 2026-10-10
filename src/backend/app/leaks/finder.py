@@ -219,7 +219,7 @@ def _analyze(session: Session, filters: StatsFilter):
         warnings.append(NO_DECISIONS)
     if skipped:
         warnings.append(
-            f"Hay {skipped} decisiones sin tabla de referencia: cargalas en Rangos preflop."
+            f"Hay {skipped} decisiones sin tabla de referencia: cargalas en Preflop."
         )
     if unresolved:
         warnings.append(f"{unresolved} decisiones de push/fold no se pudieron evaluar.")
