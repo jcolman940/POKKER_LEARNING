@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { RangeMatrix } from './RangeMatrix'
 
 const grid = (w: number) => Array<number>(169).fill(w)
@@ -26,5 +26,25 @@ describe('RangeMatrix label colour', () => {
         false,
       ),
     ).not.toContain('matrix-cell-on')
+  })
+})
+
+describe('RangeMatrix hover', () => {
+  it('reports the hovered cell and null when leaving the matrix', () => {
+    const onHover = vi.fn()
+    const { container } = render(<RangeMatrix layers={[{ action: 'raise', grid: grid(1) }]} onHover={onHover} />)
+    fireEvent.pointerEnter(container.querySelector('[title^="AKs:"]')!)
+    expect(onHover).toHaveBeenLastCalledWith(1)
+    fireEvent.pointerLeave(container.querySelector('.matrix')!)
+    expect(onHover).toHaveBeenLastCalledWith(null)
+  })
+
+  it('also reports while painting cells in the editor', () => {
+    const onHover = vi.fn()
+    const { container } = render(
+      <RangeMatrix layers={[{ action: 'raise', grid: grid(0) }]} onPaint={() => {}} onHover={onHover} />,
+    )
+    fireEvent.pointerEnter(container.querySelector('button[title^="KK:"]')!)
+    expect(onHover).toHaveBeenLastCalledWith(14)
   })
 })

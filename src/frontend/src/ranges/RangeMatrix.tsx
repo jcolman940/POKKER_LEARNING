@@ -17,6 +17,8 @@ interface Props {
   implicitFold?: boolean
   /** Index (0-168) of a cell to outline, e.g. Hero's hand. */
   highlight?: number
+  /** Index (0-168) of the cell under the pointer; null when the pointer leaves the matrix. */
+  onHover?: (index: number | null) => void
 }
 
 const CELLS = Array.from({ length: 169 }, (_, i) => i)
@@ -45,7 +47,7 @@ function describe(layers: Layer[], i: number, implicitFold: boolean): string {
   return `${handClassName(i)}: ${parts.join(', ')}`
 }
 
-export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = true, highlight }: Props) {
+export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = true, highlight, onHover }: Props) {
   const painting = useRef(false)
 
   useEffect(() => {
@@ -57,7 +59,12 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
   }, [])
 
   return (
-    <div className="matrix" role="group" aria-label={caption ?? 'Matriz de rango 13×13'}>
+    <div
+      className="matrix"
+      role="group"
+      aria-label={caption ?? 'Matriz de rango 13×13'}
+      onPointerLeave={() => onHover?.(null)}
+    >
       {CELLS.map((i) => {
         const extra = detail?.(i)
         const label = describe(layers, i, implicitFold) + (extra ? ` · ${extra}` : '')
@@ -74,7 +81,13 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
           .join(' ')
         if (!onPaint) {
           return (
-            <span key={i} className={className} style={style} title={label}>
+            <span
+              key={i}
+              className={className}
+              style={style}
+              title={label}
+              onPointerEnter={onHover ? () => onHover(i) : undefined}
+            >
               {handClassName(i)}
             </span>
           )
@@ -93,6 +106,7 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
               onPaint(i)
             }}
             onPointerEnter={() => {
+              onHover?.(i)
               if (painting.current) onPaint(i)
             }}
             onKeyDown={(e) => {
