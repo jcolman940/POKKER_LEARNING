@@ -1,0 +1,209 @@
+.sim-stage {
+  position: relative;
+  height: 470px;
+  min-width: 560px;
+}
+
+.sim-felt {
+  position: absolute;
+  inset: 12% 9% 16% 9%;
+  border-radius: 220px;
+  background: radial-gradient(ellipse at center, var(--felt) 0%, color-mix(in srgb, var(--felt) 70%, var(--felt-edge)) 55%, var(--felt-edge) 100%);
+  border: 10px solid var(--rail);
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent),
+    0 10px 30px rgb(0 0 0 / 0.5);
+}
+
+.sim-center {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.sim-pot {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.sim-pot input {
+  width: 80px;
+}
+
+.sim-pot-total {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.sim-board {
+  display: flex;
+  gap: 5px;
+}
+
+.sim-board-off {
+  opacity: 0.25;
+}
+
+.sim-seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sim-plate {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 6px;
+  background: var(--bg-deep);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius-card);
+}
+
+.sim-pos {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.sim-stack {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sim-tag {
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--line-strong);
+  color: var(--text);
+}
+
+.sim-seat-hero .sim-plate {
+  border-color: var(--gold);
+  background: var(--surface-2);
+}
+
+.sim-seat-hero .sim-tag {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+.sim-seat-villain .sim-plate {
+  border-color: var(--danger);
+}
+
+.sim-seat-villain .sim-tag {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+.sim-seat-folded .sim-plate,
+.sim-seat-empty .sim-plate {
+  opacity: 0.55;
+}
+
+.sim-seat-selected .sim-plate {
+  box-shadow: 0 0 0 3px var(--gold);
+}
+
+.sim-hero-cards {
+  display: flex;
+  gap: 4px;
+}
+
+.sim-bet {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+  text-shadow: 0 0 3px var(--bg);
+}
+
+.sim-bet i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px dashed var(--gold-ink);
+}
+
+.sim-dealer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: #111;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sim-popover-anchor {
+  position: absolute;
+  transform: translate(-50%, 0);
+  z-index: 40;
+}
+
+.sim-popover {
+  top: 46px;
+  left: -95px;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sim-popover-title {
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.sim-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sim-field {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-field legend {
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
