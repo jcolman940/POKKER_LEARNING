@@ -188,3 +188,106 @@ export function validateTable(t: TableState): string | null {
   if (new Set(cards).size !== cards.length) return 'Hay cartas repetidas.'
   return null
 }
+
+export const SIM_TABLE_KEY = 'pokker.simulator.table'
+const FORMATS: GameFormat[] = ['cash', 'mtt', 'sng', 'spin']
+const ROLES: SeatRole[] = ['hero', 'villain', 'folded', 'empty']
+
+/** Cash/6-max unless the Preflop filters say otherwise: you on BTN against the BB, on the flop. */
+export function defaultTable(filters: { format: string; players: number } | null): TableState {
+  const format = filters && FORMATS.includes(filters.format as GameFormat) ? (filters.format as GameFormat) : 'cash'
+  return {
+    format,
+    num_players: filters?.players ?? 6,
+    street: 'flop',
+    seats: [
+      { ...newSeat('BTN'), role: 'hero' },
+      { ...newSeat('BB'), role: 'villain' },
+    ],
+    pot_bb: 6.5,
+    board: '',
+    hero_hand: '',
+    advanced: { ...DEFAULT_ADVANCED },
+  }
+}
+
+/**
+ * A scenario sent by Preflop or the replayer. The amount to call goes on the first rival as its
+ * bet and the rest stays as pot, so tableToScenario gives back the same pot and price.
+ */
+export function tableFromInitial(i: Partial<ScenarioInput>, base: TableState): TableState {
+  const stack = i.effective_stack_bb ?? 100
+  const stackOf = (p: string) => i.stacks_bb?.[p] ?? stack
+  const heroPos = i.hero_position ?? null
+  const seats: Seat[] = []
+  if (heroPos) seats.push({ ...newSeat(heroPos, stackOf(heroPos)), role: 'hero' })
+  for (const v of i.villains ?? []) {
+    if (!v.position || v.position === heroPos || seats.some((s) => s.position === v.position)) continue
+    seats.push({ ...newSeat(v.position, stackOf(v.position)), role: 'villain', range: v.range || 'random', hand: v.hand ?? null })
+  }
+  const toCall = i.to_call_bb ?? 0
+  const firstRival = seats.find((s) => s.role === 'villain')
+  if (firstRival && toCall > 0) firstRival.bet_bb = toCall
+  const board = i.board ?? ''
+  const pot = i.pot_bb ?? (board === '' ? 1.5 : base.pot_bb)
+  return {
+    format: i.format ?? base.format,
+    num_players: i.num_players ?? base.num_players,
+    street: streetFromBoard(board),
+    seats: seats.length ? seats : base.seats,
+    pot_bb: round2(Math.max(0, pot - (firstRival ? toCall : 0))),
+    board,
+    hero_hand: i.hero_hand ?? '',
+    advanced: {
+      ...DEFAULT_ADVANCED,
+      ante_bb: i.ante_bb ?? 0,
+      bb_ante_bb: i.bb_ante_bb ?? 0,
+      payouts: i.payouts ?? [],
+      hero_range: i.hero_range ?? '',
+      ranges_approximate: i.ranges_approximate ?? false,
+      solver_preset: i.solver_preset ?? 'chico',
+      situation: i.situation ?? null,
+      previous_action: i.previous_action ?? '',
+    },
+  }
+}
+
+function isSeat(v: unknown): v is Seat {
+  if (typeof v !== 'object' || v === null) return false
+  const o = v as Record<string, unknown>
+  return (
+    typeof o.position === 'string' &&
+    ROLES.includes(o.role as SeatRole) &&
+    typeof o.bet_bb === 'number' &&
+    typeof o.stack_bb === 'number' &&
+    typeof o.range === 'string' &&
+    (o.hand === null || typeof o.hand === 'string')
+  )
+}
+
+export function isTableState(v: unknown): v is TableState {
+  if (typeof v !== 'object' || v === null) return false
+  const o = v as Record<string, unknown>
+  const a = o.advanced as Record<string, unknown> | null | undefined
+  return (
+    FORMATS.includes(o.format as GameFormat) &&
+    typeof o.num_players === 'number' &&
+    typeof o.street === 'string' &&
+    o.street in BOARD_CARDS &&
+    Array.isArray(o.seats) &&
+    o.seats.every(isSeat) &&
+    typeof o.pot_bb === 'number' &&
+    typeof o.board === 'string' &&
+    typeof o.hero_hand === 'string' &&
+    typeof a === 'object' &&
+    a !== null &&
+    typeof a.ante_bb === 'number' &&
+    typeof a.bb_ante_bb === 'number' &&
+    Array.isArray(a.payouts) &&
+    typeof a.hero_range === 'string' &&
+    typeof a.ranges_approximate === 'boolean' &&
+    typeof a.solver_preset === 'string' &&
+    (a.situation === null || typeof a.situation === 'string') &&
+    typeof a.previous_action === 'string'
+  )
+}

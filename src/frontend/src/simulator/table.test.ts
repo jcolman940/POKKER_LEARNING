@@ -3,7 +3,9 @@ import { makeTable, seat } from '../test/tables'
 import {
   BOARD_CARDS,
   boardForStreet,
+  defaultTable,
   heroSeat,
+  isTableState,
   newSeat,
   presetBet,
   previousActionFrom,
@@ -12,6 +14,7 @@ import {
   seatsFor,
   setRole,
   streetFromBoard,
+  tableFromInitial,
   tableToScenario,
   totalPot,
   updateSeat,
@@ -236,5 +239,82 @@ describe('validateTable', () => {
     const t = bbVsTwo()
     expect(validateTable({ ...t, board: 'AhQc2d' })).toBe('Hay cartas repetidas.')
     expect(validateTable({ ...t, seats: updateSeat(t.seats, 'CO', { hand: 'Kh9s' }) })).toBe('Hay cartas repetidas.')
+  })
+})
+
+describe('defaultTable', () => {
+  it('starts cash 6-max on the flop, you on BTN against the BB', () => {
+    const t = defaultTable(null)
+    expect(t).toMatchObject({ format: 'cash', num_players: 6, street: 'flop', pot_bb: 6.5, board: '', hero_hand: '' })
+    expect(heroSeat(t.seats)?.position).toBe('BTN')
+    expect(villainSeats(t.seats).map((s) => s.position)).toEqual(['BB'])
+  })
+
+  it('takes format and players from the Preflop filters', () => {
+    expect(defaultTable({ format: 'mtt', players: 9 })).toMatchObject({ format: 'mtt', num_players: 9 })
+    expect(defaultTable({ format: 'raro', players: 9 }).format).toBe('cash')
+  })
+})
+
+describe('tableFromInitial', () => {
+  it('opens a Preflop spot on the preflop street with the blinds in the pot', () => {
+    const t = tableFromInitial(
+      {
+        format: 'cash',
+        num_players: 6,
+        hero_position: 'CO',
+        effective_stack_bb: 40,
+        situation: 'rfi',
+        villains: [{ position: 'BB', range: 'random', hand: null }],
+      },
+      defaultTable(null),
+    )
+    expect(t).toMatchObject({ street: 'preflop', pot_bb: 1.5, board: '' })
+    expect(t.advanced.situation).toBe('rfi')
+    expect(heroSeat(t.seats)).toMatchObject({ position: 'CO', stack_bb: 40 })
+    expect(villainSeats(t.seats)).toEqual([{ ...newSeat('BB', 40), role: 'villain' }])
+  })
+
+  it('rebuilds a replayer spot that translates back to the same pot and price', () => {
+    const initial = {
+      format: 'cash' as const,
+      num_players: 6,
+      hero_position: 'BB',
+      hero_hand: 'AhKs',
+      villains: [{ position: 'BTN', range: '22+,A2s+', hand: null }],
+      board: 'Kh7c2d',
+      pot_bb: 11.5,
+      to_call_bb: 4,
+      effective_stack_bb: 93,
+      previous_action: 'BTN abre 2.5bb; BB paga; BTN apuesta 4',
+    }
+    const t = tableFromInitial(initial, defaultTable(null))
+    expect(t.street).toBe('flop')
+    const s = tableToScenario(t)
+    expect(s.pot_bb).toBe(11.5)
+    expect(s.to_call_bb).toBe(4)
+    expect(s.previous_action).toBe('BTN abre 2.5bb; BB paga; BTN apuesta 4')
+    expect(s.villains).toEqual([{ position: 'BTN', range: '22+,A2s+', hand: null }])
+  })
+
+  it('never seats a rival on the hero position', () => {
+    const t = tableFromInitial(
+      { hero_position: 'BB', villains: [{ position: 'BB', range: 'random', hand: null }] },
+      defaultTable(null),
+    )
+    expect(villainSeats(t.seats)).toEqual([])
+  })
+})
+
+describe('isTableState', () => {
+  it('accepts a real table and rejects corrupt or older shapes', () => {
+    expect(isTableState(defaultTable(null))).toBe(true)
+    expect(isTableState(JSON.parse(JSON.stringify(defaultTable(null))))).toBe(true)
+    expect(isTableState(null)).toBe(false)
+    expect(isTableState({ ...defaultTable(null), seats: [{ position: 'BTN' }] })).toBe(false)
+    expect(isTableState({ ...defaultTable(null), street: 'showdown' })).toBe(false)
+    const noAdvanced: Record<string, unknown> = { ...defaultTable(null) }
+    delete noAdvanced.advanced
+    expect(isTableState(noAdvanced)).toBe(false)
   })
 })
