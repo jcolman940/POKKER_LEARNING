@@ -18,7 +18,7 @@ describe('App', () => {
       'POST /api/ranges/parse': () => ({ json: { valid: true, error: null, combos: 1326, grid: [] } }),
     })
     render(<App />)
-    expect(screen.getByRole('heading', { name: 'Poker Study' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'POKKER' })).toBeInTheDocument()
     expect(await screen.findByText('Backend 0.1.0 · núcleo 0.1.0')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Simulador' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: /Entrenador/ })).toBeEnabled()
@@ -113,5 +113,26 @@ describe('App', () => {
         prefer_due: true,
       })
     })
+  })
+
+  it('remembers the collapsed menu and survives a broken localStorage', () => {
+    mockApi({
+      'GET /api/version': () => ({ json: { app: '0.1.0', core: '0.1.0' } }),
+      'GET /api/simulator/positions': () => ({ json: POSITIONS }),
+      'POST /api/ranges/parse': () => ({ json: { valid: true, error: null, combos: 1326, grid: [] } }),
+    })
+    window.localStorage.setItem('pokker.sidebar.collapsed', 'true')
+    const { unmount } = render(<App />)
+    expect(screen.getByRole('navigation', { name: 'Secciones' })).toHaveClass('sidebar-collapsed')
+    fireEvent.click(screen.getByRole('button', { name: 'Desplegar menú' }))
+    expect(window.localStorage.getItem('pokker.sidebar.collapsed')).toBe('false')
+    unmount()
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    render(<App />)
+    expect(screen.getByRole('navigation', { name: 'Secciones' })).not.toHaveClass('sidebar-collapsed')
+    window.localStorage.clear()
   })
 })

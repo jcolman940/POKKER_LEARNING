@@ -128,7 +128,7 @@ export function StatsPage({ onTrain }: { onTrain?: (f: InitialFilters) => void }
       <section className="panel" aria-labelledby="metrics-title">
         <h3 id="metrics-title">Métricas</h3>
         {groups.length === 0 ? (
-          <p className="muted">No hay manos con estos filtros. Importalas en Historiales.</p>
+          <p className="muted">No hay manos con estos filtros. Importalas en Manos.</p>
         ) : groupBy === 'none' ? (
           <table className="metrics-table">
             <thead>

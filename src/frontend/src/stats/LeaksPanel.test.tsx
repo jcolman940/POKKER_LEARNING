@@ -139,7 +139,7 @@ describe('LeaksPanel', () => {
     })
     render(<LeaksPanel filters={EMPTY_FILTERS} onTrain={vi.fn()} />)
     expect(await screen.findByText('Importá historiales')).toBeInTheDocument()
-    expect(screen.getByText(/Importá tus historiales en Historiales/)).toBeInTheDocument()
+    expect(screen.getByText(/Importá tus historiales en Manos/)).toBeInTheDocument()
   })
 
   it('shows errors', async () => {

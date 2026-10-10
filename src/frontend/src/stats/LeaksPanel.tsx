@@ -309,7 +309,7 @@ export function LeaksPanel({
       {report && report.leaks.length === 0 && !empty && (
         <p className="muted">No hay leaks significativos con estos filtros.</p>
       )}
-      {empty && <p className="muted">Importá tus historiales en Historiales para ver tus leaks.</p>}
+      {empty && <p className="muted">Importá tus historiales en Manos para ver tus leaks.</p>}
       {report && report.insufficient.length > 0 && (
         <details>
           <summary>Muestra insuficiente</summary>

@@ -1,0 +1,134 @@
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-2);
+  background: var(--bg-deep);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  transition: width 0.15s ease;
+}
+
+.sidebar-collapsed {
+  width: var(--sidebar-width-collapsed);
+  padding-inline: var(--space-1);
+}
+
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 var(--space-2) var(--space-2);
+  gap: var(--space-1);
+}
+
+.sidebar-collapsed .sidebar-top {
+  flex-direction: column;
+  margin-inline: 0;
+}
+
+.sidebar-logo {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+}
+
+.sidebar-toggle {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  font-size: 14px;
+}
+
+.sidebar-toggle:hover {
+  color: var(--gold);
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-group-title {
+  margin: var(--space-3) var(--space-2) var(--space-1);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar-collapsed .sidebar-group-title {
+  visibility: hidden;
+  height: 1px;
+  margin-block: var(--space-2);
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-muted);
+  text-align: left;
+  font-size: 13px;
+}
+
+.sidebar-item:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.sidebar-item-active,
+.sidebar-item-active:hover {
+  background: var(--surface-2);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-icon {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-status {
+  margin-top: auto;
+  padding: var(--space-2);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sidebar-status-line {
+  display: block;
+}
+
+/* Collapsed: labels stay in the accessibility tree, hidden visually (same as .sr-only). */
+.sidebar-collapsed .sidebar-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

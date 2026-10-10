@@ -117,7 +117,7 @@ export function PushFoldPage() {
     }
     try {
       await postJson('/api/charts', chart)
-      setMessage(`Guardado en Rangos preflop: "${chart.name}".`)
+      setMessage(`Guardado en Preflop: "${chart.name}".`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
