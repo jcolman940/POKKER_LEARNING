@@ -1,0 +1,85 @@
+.ui-choice {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.ui-choice-legend {
+  padding: 0;
+  margin-bottom: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ui-choice-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ui-choice-vertical .ui-choice-items {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 1px;
+}
+
+.ui-choice-item {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  color: var(--text);
+}
+
+/* The radio stays focusable and announced; the label text is what you see. */
+.ui-choice-item input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.ui-choice-item span {
+  display: block;
+  padding: 6px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ui-choice-vertical .ui-choice-item span {
+  border-radius: 0;
+  padding: 9px 12px;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.ui-choice-item:hover span {
+  background: var(--surface-2);
+}
+
+.ui-choice-item input:checked + span {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+.ui-choice-item input:focus-visible + span {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.ui-choice-disabled,
+.ui-choice-disabled input {
+  cursor: not-allowed;
+}
+
+.ui-choice-disabled span,
+.ui-choice-disabled:hover span {
+  background: var(--surface);
+  color: var(--text-dim);
+}

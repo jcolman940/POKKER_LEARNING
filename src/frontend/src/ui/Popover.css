@@ -1,0 +1,10 @@
+.ui-popover {
+  position: absolute;
+  z-index: 50;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-card);
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px #000a;
+}
