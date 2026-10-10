@@ -20,10 +20,6 @@
   white-space: nowrap;
 }
 
-.row-selected {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
 .row-actions {
   display: flex;
   gap: 6px;

@@ -135,4 +135,34 @@ describe('App', () => {
     expect(screen.getByRole('navigation', { name: 'Secciones' })).not.toHaveClass('sidebar-collapsed')
     window.localStorage.clear()
   })
+
+  it('opens a preflop spot in the simulator with the position preset', async () => {
+    const raise = Array<number>(169).fill(0)
+    raise[0] = 1
+    mockApi({
+      'GET /api/version': () => ({ json: { app: '0.1.0', core: '0.1.0' } }),
+      'GET /api/charts': () => ({
+        json: [
+          {
+            id: 1, name: 'CO open', source: 'pokalab', game_format: 'cash', players: 6, position: 'CO',
+            vs_position: null, stack_bb: 100, situation: 'rfi', open_size_bb: 2.5, rake: null, ante_bb: 0,
+            note: '', actions: { raise }, created_at: '2026-10-01T00:00:00', updated_at: '2026-10-01T00:00:00',
+          },
+        ],
+      }),
+      'GET /api/simulator/positions': () => ({ json: POSITIONS }),
+      'POST /api/ranges/parse': () => ({ json: { valid: true, error: null, combos: 1326, grid: [] } }),
+    })
+    window.localStorage.setItem(
+      'pokker.preflop.filters',
+      JSON.stringify({ format: 'cash', source: 'all', rake: 'all', players: 6 }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Preflop' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Abrir en Simulador/ }))
+    expect(screen.getByRole('button', { name: 'Simulador' })).toHaveAttribute('aria-current', 'page')
+    // Hero and each rival have a "Posición" select; the hero one is #hero-pos.
+    await waitFor(() => expect(document.getElementById('hero-pos')).toHaveValue('CO'))
+    window.localStorage.clear()
+  })
 })

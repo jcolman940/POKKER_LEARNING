@@ -4,7 +4,7 @@ import { startHeartbeat } from './app/heartbeat'
 import { HistoryPage } from './history/HistoryPage'
 import { ReplayerView } from './history/ReplayerView'
 import { PushFoldPage } from './pushfold/PushFoldPage'
-import { ChartsPage } from './ranges/ChartsPage'
+import { PreflopPage } from './ranges/PreflopPage'
 import { type InitialScenario, SimulatorPage } from './simulator/SimulatorPage'
 import { SolverPage } from './solver/SolverPage'
 import { StatsPage } from './stats/StatsPage'
@@ -110,7 +110,18 @@ export default function App() {
             }}
           />
         )}
-        {section === 'ranges' && <ChartsPage />}
+        {section === 'ranges' && (
+          <PreflopPage
+            onOpenSimulator={(scenario) => {
+              setSpot({ key: Date.now(), scenario })
+              setSection('simulator')
+            }}
+            onTrain={(filters) => {
+              setTrainer({ key: Date.now(), filters })
+              setSection('trainer')
+            }}
+          />
+        )}
         {section === 'pushfold' && <PushFoldPage />}
         {section === 'solver' && <SolverPage />}
         {section === 'trainer' && <TrainerPage key={trainer.key} initialFilters={trainer.filters} />}
