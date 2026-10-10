@@ -24,7 +24,9 @@
 
 .trainer-check {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
+  color: var(--text);
   gap: 4px;
 }
 

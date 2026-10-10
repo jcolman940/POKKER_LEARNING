@@ -62,3 +62,24 @@
 .rec-warnings {
   color: var(--warn);
 }
+
+/* Solver sub-tabs (Cola / Biblioteca / Configuración) */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.tab-active,
+.tab-active:hover:not(:disabled) {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--gold-ink);
+}
