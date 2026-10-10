@@ -1,17 +1,9 @@
-import { createRef, type ReactNode, type RefObject, useRef } from 'react'
+import { createRef, type ReactNode, type RefObject, useState } from 'react'
 import { CardView } from './CardView'
+import { type CardSlotRef, sameSlot } from './slots'
 import { toSlots } from './cards'
 import { BOARD_CARDS, rotateFromHero, type Seat, type SeatRole, seatPoint, type TableState, totalPot } from './table'
 import './table.css'
-
-export type CardSlotRef =
-  | { group: 'hero' | 'board'; index: number }
-  | { group: 'seat'; position: string; index: number }
-
-export function sameSlot(a: CardSlotRef | null, b: CardSlotRef): boolean {
-  if (!a || a.group !== b.group || a.index !== b.index) return false
-  return a.group !== 'seat' || (b.group === 'seat' && a.position === b.position)
-}
 
 const ROLE_TAG: Record<SeatRole, string> = { hero: 'Vos', villain: 'Rival', folded: 'Fold', empty: 'Vacío' }
 const BOARD_LABELS = ['Flop 1', 'Flop 2', 'Flop 3', 'Turn', 'River']
@@ -32,12 +24,13 @@ interface TableViewProps {
 }
 
 export function TableView({ table, selected, onSeatClick, activeSlot, onSlotClick, onPotChange, renderSeatPanel }: TableViewProps) {
-  const refs = useRef(new Map<string, RefObject<HTMLButtonElement | null>>())
+  // One stable ref per seat position (the seat popover anchors to it); kept in state, not read from a ref.
+  const [refs] = useState(() => new Map<string, RefObject<HTMLButtonElement | null>>())
   const refFor = (position: string) => {
-    let r = refs.current.get(position)
+    let r = refs.get(position)
     if (!r) {
       r = createRef<HTMLButtonElement>()
-      refs.current.set(position, r)
+      refs.set(position, r)
     }
     return r
   }

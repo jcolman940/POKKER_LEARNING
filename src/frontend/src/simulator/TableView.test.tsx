@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { makeTable, seat } from '../test/tables'
-import { sameSlot, TableView } from './TableView'
+import { sameSlot } from './slots'
+import { TableView } from './TableView'
 
 function setup(table = makeTable(), extra: Partial<Parameters<typeof TableView>[0]> = {}) {
   const props = {
