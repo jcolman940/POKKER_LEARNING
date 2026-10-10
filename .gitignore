@@ -30,3 +30,6 @@ src/frontend/dist/
 # Local app data
 var/
 src/launcher/out/
+
+# Brainstorming companion (local)
+.superpowers/

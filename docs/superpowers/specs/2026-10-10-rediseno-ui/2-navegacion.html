@@ -1,0 +1,46 @@
+<h2>¿Cómo navegás entre secciones?</h2>
+<p class="subtitle">Hoy hay 8 secciones (Preflop, Simulador, Push/Fold, Entrenador, Historiales, Estadísticas, Solver, más el estado de la app). Con la paleta Paño y oro, dos formas de ordenarlas.</p>
+
+<style>
+  .nv { border-radius:12px; overflow:hidden; background:#0d1a14; color:#e8efe9; font-family:'Segoe UI',system-ui,sans-serif; height:300px; display:flex; flex-direction:column; }
+  .nv-top { display:flex; gap:16px; align-items:center; padding:12px 16px; background:#0a140f; border-bottom:1px solid #1d3527; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8fa898; white-space:nowrap; }
+  .nv-logo { font-weight:800; font-size:14px; letter-spacing:.12em; color:#d9b45a; margin-right:6px; }
+  .nv-on { color:#d9b45a; border-bottom:2px solid #d9b45a; padding-bottom:3px; }
+  .nv-main { flex:1; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .nv-ph { background:#13261c; border-radius:10px; flex:1; display:flex; align-items:center; justify-content:center; color:#4d6b58; font-size:12px; }
+  .nv-side { width:170px; background:#0a140f; border-right:1px solid #1d3527; padding:14px 10px; display:flex; flex-direction:column; gap:3px; font-size:12px; }
+  .nv-side .grp { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#4d6b58; margin:10px 8px 4px; }
+  .nv-item { padding:7px 10px; border-radius:7px; color:#a9bdb0; display:flex; gap:9px; align-items:center; }
+  .nv-item.on { background:#1c3527; color:#d9b45a; font-weight:700; }
+</style>
+
+<div class="cards">
+  <div class="card" data-choice="a-arriba" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="nv">
+        <div class="nv-top">
+          <span class="nv-logo">♠ POKKER</span>
+          <span class="nv-on">Preflop</span><span>Simulador</span><span>Push/Fold</span><span>Entrenador</span><span>Manos</span><span>Stats</span><span>Solver</span>
+        </div>
+        <div class="nv-main"><div class="nv-ph">contenido a todo el ancho</div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A · Barra arriba</h3><p>Como tus capturas y como hoy. Máximo ancho para la mesa y la matriz. Con 7 secciones la barra queda justa en pantallas chicas.</p></div>
+  </div>
+
+  <div class="card" data-choice="b-lateral" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="nv" style="flex-direction:row;">
+        <div class="nv-side">
+          <span class="nv-logo" style="margin:0 8px 6px;">♠ POKKER</span>
+          <div class="grp">Estudiar</div>
+          <div class="nv-item on">♦ Preflop</div><div class="nv-item">⬭ Simulador</div><div class="nv-item">⇪ Push/Fold</div><div class="nv-item">✎ Entrenador</div>
+          <div class="grp">Analizar</div>
+          <div class="nv-item">☰ Manos</div><div class="nv-item">▤ Estadísticas</div><div class="nv-item">⚙ Solver</div>
+        </div>
+        <div class="nv-main"><div class="nv-ph">contenido</div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B · Menú lateral agrupado</h3><p>Secciones agrupadas en "Estudiar" y "Analizar": más fácil de entender de un vistazo. Resta ~170 px de ancho (se puede plegar a íconos).</p></div>
+  </div>
+</div>

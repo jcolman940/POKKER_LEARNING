@@ -1,0 +1,125 @@
+<h2>Simulador: la mesa</h2>
+<p class="subtitle">6-max porque viene del filtro de Preflop (con 9-max aparecen 9 asientos). Vos siempre abajo al centro: la mesa gira según tu posición. Tocás un asiento para editarlo (abajo, el popup del BTN de ejemplo).</p>
+
+<style>
+  .sim { display:flex; border-radius:12px; overflow:hidden; background:#0d1a14; color:#e8efe9; font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; }
+  .side { width:44px; background:#0a140f; border-right:1px solid #1d3527; padding:14px 0; display:flex; flex-direction:column; align-items:center; gap:14px; color:#6f8a79; font-size:15px; }
+  .side .on { color:#d9b45a; }
+  .main { flex:1; padding:16px 18px; min-width:0; }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .chip { display:inline-flex; gap:8px; align-items:center; background:#13261c; border:1px solid #1f3a2b; border-radius:20px; padding:5px 12px; color:#a9bdb0; }
+  .chip b { color:#e8efe9; } .chip a { color:#d9b45a; font-weight:700; }
+  .streets span { display:inline-block; padding:6px 12px; border-radius:7px; background:#13261c; font-weight:700; margin-left:4px; color:#c5d4ca; }
+  .streets span.on { background:#d9b45a; color:#1a1406; }
+  .wrap { display:flex; gap:16px; }
+  .stage { position:relative; flex:1; height:430px; min-width:540px; }
+  .felt { position:absolute; left:9%; right:9%; top:12%; bottom:16%; border-radius:200px; background:radial-gradient(ellipse at center, #1f6b45 0%, #155236 55%, #0f3d28 100%); border:10px solid #3a2a16; box-shadow: inset 0 0 0 3px #d9b45a55, 0 10px 30px #0008; }
+  .center { position:absolute; left:50%; top:47%; transform:translate(-50%,-50%); text-align:center; }
+  .pot { font-weight:800; color:#f3e3b5; margin-bottom:8px; font-size:13px; }
+  .pot small { display:block; font-weight:500; color:#a9cdb8; font-size:10px; }
+  .cards { display:flex; gap:5px; justify-content:center; }
+  .card { width:34px; height:48px; border-radius:5px; background:#f7f3ea; color:#111; font-weight:800; font-size:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; box-shadow:0 2px 4px #0006; }
+  .card.r { color:#c0392b; }
+  .card.empty { background:transparent; border:2px dashed #6fae8a88; color:#6fae8a; font-size:16px; box-shadow:none; }
+  .seat { position:absolute; transform:translate(-50%,-50%); width:104px; text-align:center; }
+  .plate { background:#0a140f; border:2px solid #2c4a39; border-radius:10px; padding:6px 6px; }
+  .plate .pos { font-weight:800; letter-spacing:.06em; }
+  .plate .stk { color:#8fa898; font-size:11px; }
+  .plate .tag { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.08em; padding:1px 6px; border-radius:4px; margin-top:3px; }
+  .seat.rival .plate { border-color:#c2524a; }
+  .seat.rival .tag { background:#c2524a; color:#fff; }
+  .seat.hero .plate { border-color:#d9b45a; background:#1c3527; }
+  .seat.hero .tag { background:#d9b45a; color:#1a1406; }
+  .seat.fold .plate { opacity:.45; }
+  .seat.fold .tag { background:#2c4a39; color:#a9bdb0; }
+  .seat.sel .plate { box-shadow:0 0 0 3px #d9b45a; }
+  .bet { position:absolute; transform:translate(-50%,-50%); display:flex; align-items:center; gap:4px; font-weight:800; color:#f3e3b5; font-size:11px; }
+  .bet i { width:14px; height:14px; border-radius:50%; background:#d9b45a; border:2px dashed #7a5c1c; box-sizing:border-box; display:inline-block; }
+  .dealer { position:absolute; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%; background:#f7f3ea; color:#111; font-weight:900; font-size:10px; display:flex; align-items:center; justify-content:center; }
+  .hcards { display:flex; gap:4px; justify-content:center; margin-bottom:5px; }
+  .hcards .card { width:38px; height:54px; font-size:16px; }
+  .pop { position:absolute; left:67%; top:36%; width:190px; background:#13261c; border:1px solid #d9b45a; border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px #000a; z-index:3; }
+  .pop .lab { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8fa898; margin:6px 0 4px; font-weight:700; }
+  .seg span { display:inline-block; padding:4px 9px; border-radius:6px; background:#0d1a14; font-weight:700; margin:0 3px 3px 0; color:#c5d4ca; font-size:11px; }
+  .seg span.on { background:#d9b45a; color:#1a1406; }
+  .inp { background:#0d1a14; border:1px solid #2c4a39; border-radius:6px; padding:5px 8px; color:#e8efe9; }
+  .panel { width:210px; flex-shrink:0; }
+  .box { background:#13261c; border-radius:10px; padding:12px; margin-bottom:10px; }
+  .box .lab { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8fa898; margin-bottom:6px; font-weight:700; }
+  .eq { font-size:26px; font-weight:800; color:#d9b45a; }
+  .bar { height:8px; border-radius:4px; background:#0d1a14; overflow:hidden; margin:6px 0 10px; } .bar div { height:100%; background:#2f9e63; }
+  .kv { display:flex; justify-content:space-between; padding:3px 0; color:#c5d4ca; } .kv b { color:#e8efe9; }
+  .rec span { display:inline-block; padding:5px 10px; border-radius:6px; font-weight:800; margin:0 4px 4px 0; }
+  .gold { display:block; text-align:center; padding:10px; border-radius:8px; background:#d9b45a; color:#1a1406; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+</style>
+
+<div class="sim">
+  <div class="side"><span>♠</span><span>♦</span><span class="on">⬭</span><span>⇪</span><span>✎</span><span>☰</span><span>▤</span><span>⚙</span></div>
+  <div class="main">
+    <div class="top">
+      <span class="chip"><b>Cash</b> · <b>6-max</b> · 100bb <a>Cambiar</a></span>
+      <span class="streets"><span>Preflop</span><span class="on">Flop</span><span>Turn</span><span>River</span></span>
+    </div>
+    <div class="wrap">
+      <div class="stage">
+        <div class="felt"></div>
+
+        <div class="center">
+          <div class="pot">Pozo 6,5 bb <small>clic para editar · +bets: 10,5 bb</small></div>
+          <div class="cards">
+            <div class="card r">K<span>♥</span></div><div class="card">7<span>♣</span></div><div class="card r">2<span>♦</span></div>
+            <div class="card empty">+</div><div class="card empty">+</div>
+          </div>
+        </div>
+
+        <!-- seats: hero bottom center, clockwise -->
+        <div class="seat hero" style="left:50%; top:90%;">
+          <div class="hcards"><div class="card r">A<span>♥</span></div><div class="card">K<span>♠</span></div></div>
+          <div class="plate"><div class="pos">BB</div><div class="stk">96 bb</div><span class="tag">VOS</span></div>
+        </div>
+        <div class="seat fold" style="left:12%; top:70%;"><div class="plate"><div class="pos">UTG</div><div class="stk">100 bb</div><span class="tag">FOLD</span></div></div>
+        <div class="seat fold" style="left:12%; top:24%;"><div class="plate"><div class="pos">HJ</div><div class="stk">100 bb</div><span class="tag">FOLD</span></div></div>
+        <div class="seat rival" style="left:50%; top:6%;"><div class="plate"><div class="pos">CO</div><div class="stk">93 bb</div><span class="tag">RIVAL</span></div></div>
+        <div class="seat rival sel" style="left:88%; top:24%;"><div class="plate"><div class="pos">BTN</div><div class="stk">93 bb</div><span class="tag">RIVAL</span></div></div>
+        <div class="seat fold" style="left:88%; top:70%;"><div class="plate"><div class="pos">SB</div><div class="stk">99,5 bb</div><span class="tag">FOLD</span></div></div>
+
+        <div class="bet" style="left:50%; top:22%;"><i></i>4 bb</div>
+        <div class="bet" style="left:76%; top:32%;"><i></i>4 bb</div>
+        <div class="dealer" style="left:80%; top:14%;">D</div>
+
+        <div class="pop">
+          <div style="font-weight:800; color:#d9b45a;">BTN</div>
+          <div class="lab">Asiento</div>
+          <div class="seg"><span>Vos</span><span class="on">Rival</span><span>Fold</span><span>Vacío</span></div>
+          <div class="lab">Apuesta en esta calle</div>
+          <div class="seg"><span>⅓</span><span>½</span><span class="on">⅔</span><span>Pot</span><span>All-in</span></div>
+          <span class="inp">4 bb</span>
+          <div class="lab">Stack</div><span class="inp">93 bb</span>
+          <div class="lab">Rango</div>
+          <span class="inp" style="display:block">BTN RFI 100bb · 42% ▾</span>
+          <div style="color:#8fa898; font-size:10px; margin-top:4px">desde tus tablas · ver/editar matriz</div>
+          <div class="lab">Cartas (opcional)</div>
+          <div class="cards" style="justify-content:flex-start"><div class="card empty" style="width:26px;height:36px">?</div><div class="card empty" style="width:26px;height:36px">?</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="box">
+          <div class="lab">Tu equity vs rangos</div>
+          <div class="eq">58,2%</div>
+          <div class="bar"><div style="width:58%"></div></div>
+          <div class="kv"><span>Pot odds</span><b>27,6%</b></div>
+          <div class="kv"><span>Equity requerida</span><b>27,6%</b></div>
+          <div class="kv"><span>SPR</span><b>6,2</b></div>
+          <div class="kv"><span>Outs</span><b>—</b></div>
+        </div>
+        <div class="box">
+          <div class="lab">Recomendación · aproximado</div>
+          <div class="rec"><span style="background:#2f9e63;color:#0b1510">Call 64%</span><span style="background:#c2524a;color:#fff">Raise 21%</span><span style="background:#1a2e23;color:#8fa898">Fold 15%</span></div>
+          <div style="color:#8fa898; margin-top:4px">Multiway: heurística. ▸ por qué</div>
+        </div>
+        <span class="gold">Analizar</span>
+      </div>
+    </div>
+  </div>
+</div>

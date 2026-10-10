@@ -1,0 +1,121 @@
+<h2>¿Qué estilo oscuro te gusta para POKKER?</h2>
+<p class="subtitle">Tres direcciones con identidad propia. Cada una muestra la barra de navegación, una tarjeta de filtros, un pedazo de la matriz 13×13 y el botón principal. Hacé clic en la que prefieras (podés mezclar: "la A con el acento de la C").</p>
+
+<style>
+  .pk { border-radius: 12px; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .pk-nav { display:flex; gap:18px; align-items:center; padding:12px 16px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+  .pk-logo { font-weight:800; font-size:15px; letter-spacing:.12em; margin-right:10px; }
+  .pk-body { display:flex; gap:14px; padding:16px; }
+  .pk-card { border-radius:10px; padding:12px 14px; width:150px; }
+  .pk-card h5 { margin:0 0 10px; font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+  .pk-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:600; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.08); text-transform:uppercase; }
+  .pk-radio { width:14px; height:14px; border-radius:50%; border:2px solid; box-sizing:border-box; }
+  .pk-grid { display:grid; grid-template-columns:repeat(5, 38px); gap:3px; }
+  .pk-grid div { height:30px; border-radius:4px; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .pk-legend { display:flex; gap:12px; font-size:11px; margin-bottom:8px; font-weight:600; }
+  .pk-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .pk-btn { margin:0 16px 16px; display:inline-block; padding:9px 26px; border-radius:8px; font-weight:800; font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+</style>
+
+<div class="cards">
+
+  <!-- A: Paño y oro -->
+  <div class="card" data-choice="a-pano-oro" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="pk" style="background:#0d1a14; color:#e8efe9;">
+        <div class="pk-nav" style="background:#0a140f; border-bottom:1px solid #1d3527;">
+          <span class="pk-logo" style="color:#d9b45a;">♠ POKKER</span>
+          <span style="color:#d9b45a; border-bottom:2px solid #d9b45a; padding-bottom:3px;">Preflop</span>
+          <span style="color:#8fa898;">Simulador</span><span style="color:#8fa898;">Entrenador</span>
+        </div>
+        <div class="pk-body">
+          <div class="pk-card" style="background:#13261c;">
+            <h5 style="color:#8fa898;">Juego</h5>
+            <div class="pk-row">Cash <span class="pk-radio" style="border-color:#d9b45a; background:radial-gradient(#d9b45a 45%, transparent 50%);"></span></div>
+            <div class="pk-row">Torneos <span class="pk-radio" style="border-color:#4d6b58;"></span></div>
+            <div class="pk-row" style="border:0;">Spin &amp; Go <span class="pk-radio" style="border-color:#4d6b58;"></span></div>
+          </div>
+          <div>
+            <div class="pk-legend"><span><i style="background:#2f9e63"></i>Raise</span><span><i style="background:#d9b45a"></i>Marginal</span><span><i style="background:#c2524a"></i>All-in</span></div>
+            <div class="pk-grid" style="color:#0b1510;">
+              <div style="background:#c2524a">AA</div><div style="background:#2f9e63">AKs</div><div style="background:#2f9e63">AQs</div><div style="background:#2f9e63">AJs</div><div style="background:#2f9e63">ATs</div>
+              <div style="background:#2f9e63">AKo</div><div style="background:#c2524a">KK</div><div style="background:#2f9e63">KQs</div><div style="background:#2f9e63">KJs</div><div style="background:#d9b45a">KTs</div>
+              <div style="background:#2f9e63">AQo</div><div style="background:#2f9e63">KQo</div><div style="background:#2f9e63">QQ</div><div style="background:#2f9e63">QJs</div><div style="background:#d9b45a">QTs</div>
+              <div style="background:#2f9e63">AJo</div><div style="background:#d9b45a">KJo</div><div style="background:#1a2e23;color:#5e7a68">QJo</div><div style="background:#2f9e63">JJ</div><div style="background:#2f9e63">JTs</div>
+              <div style="background:#d9b45a">ATo</div><div style="background:#1a2e23;color:#5e7a68">KTo</div><div style="background:#1a2e23;color:#5e7a68">QTo</div><div style="background:#1a2e23;color:#5e7a68">JTo</div><div style="background:#2f9e63">TT</div>
+            </div>
+          </div>
+        </div>
+        <span class="pk-btn" style="background:#d9b45a; color:#1a1406;">Aplicar</span>
+      </div>
+    </div>
+    <div class="card-body"><h3>A · Paño y oro</h3><p>Verde de mesa profundo, dorado para lo activo. Clásico de casino, cálido, muy "poker".</p></div>
+  </div>
+
+  <!-- B: Medianoche turquesa -->
+  <div class="card" data-choice="b-medianoche" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="pk" style="background:#0b1020; color:#e6ebf5;">
+        <div class="pk-nav" style="background:#080c18; border-bottom:1px solid #1c2440;">
+          <span class="pk-logo" style="color:#2dd4bf;">♠ POKKER</span>
+          <span style="color:#2dd4bf; border-bottom:2px solid #2dd4bf; padding-bottom:3px;">Preflop</span>
+          <span style="color:#8792b0;">Simulador</span><span style="color:#8792b0;">Entrenador</span>
+        </div>
+        <div class="pk-body">
+          <div class="pk-card" style="background:#131a30;">
+            <h5 style="color:#8792b0;">Juego</h5>
+            <div class="pk-row">Cash <span class="pk-radio" style="border-color:#2dd4bf; background:radial-gradient(#2dd4bf 45%, transparent 50%);"></span></div>
+            <div class="pk-row">Torneos <span class="pk-radio" style="border-color:#3d4868;"></span></div>
+            <div class="pk-row" style="border:0;">Spin &amp; Go <span class="pk-radio" style="border-color:#3d4868;"></span></div>
+          </div>
+          <div>
+            <div class="pk-legend"><span><i style="background:#2dd4bf"></i>Raise</span><span><i style="background:#fbbf6a"></i>Marginal</span><span><i style="background:#f472b6"></i>All-in</span></div>
+            <div class="pk-grid" style="color:#08101c;">
+              <div style="background:#f472b6">AA</div><div style="background:#2dd4bf">AKs</div><div style="background:#2dd4bf">AQs</div><div style="background:#2dd4bf">AJs</div><div style="background:#2dd4bf">ATs</div>
+              <div style="background:#2dd4bf">AKo</div><div style="background:#f472b6">KK</div><div style="background:#2dd4bf">KQs</div><div style="background:#2dd4bf">KJs</div><div style="background:#fbbf6a">KTs</div>
+              <div style="background:#2dd4bf">AQo</div><div style="background:#2dd4bf">KQo</div><div style="background:#2dd4bf">QQ</div><div style="background:#2dd4bf">QJs</div><div style="background:#fbbf6a">QTs</div>
+              <div style="background:#2dd4bf">AJo</div><div style="background:#fbbf6a">KJo</div><div style="background:#182039;color:#56618a">QJo</div><div style="background:#2dd4bf">JJ</div><div style="background:#2dd4bf">JTs</div>
+              <div style="background:#fbbf6a">ATo</div><div style="background:#182039;color:#56618a">KTo</div><div style="background:#182039;color:#56618a">QTo</div><div style="background:#182039;color:#56618a">JTo</div><div style="background:#2dd4bf">TT</div>
+            </div>
+          </div>
+        </div>
+        <span class="pk-btn" style="background:#2dd4bf; color:#062420;">Aplicar</span>
+      </div>
+    </div>
+    <div class="card-body"><h3>B · Medianoche turquesa</h3><p>Azul tinta con turquesa (no el cian de tus capturas) y rosa para all-in. Moderno, limpio, alto contraste.</p></div>
+  </div>
+
+  <!-- C: Grafito y ámbar -->
+  <div class="card" data-choice="c-grafito-ambar" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="pk" style="background:#121214; color:#ececef;">
+        <div class="pk-nav" style="background:#0c0c0e; border-bottom:1px solid #26262b;">
+          <span class="pk-logo" style="color:#f5a524;">♠ POKKER</span>
+          <span style="color:#f5a524; border-bottom:2px solid #f5a524; padding-bottom:3px;">Preflop</span>
+          <span style="color:#8b8b94;">Simulador</span><span style="color:#8b8b94;">Entrenador</span>
+        </div>
+        <div class="pk-body">
+          <div class="pk-card" style="background:#1b1b1f;">
+            <h5 style="color:#8b8b94;">Juego</h5>
+            <div class="pk-row">Cash <span class="pk-radio" style="border-color:#f5a524; background:radial-gradient(#f5a524 45%, transparent 50%);"></span></div>
+            <div class="pk-row">Torneos <span class="pk-radio" style="border-color:#45454d;"></span></div>
+            <div class="pk-row" style="border:0;">Spin &amp; Go <span class="pk-radio" style="border-color:#45454d;"></span></div>
+          </div>
+          <div>
+            <div class="pk-legend"><span><i style="background:#f5a524"></i>Raise</span><span><i style="background:#a78bfa"></i>Marginal</span><span><i style="background:#ef4444"></i>All-in</span></div>
+            <div class="pk-grid" style="color:#141008;">
+              <div style="background:#ef4444">AA</div><div style="background:#f5a524">AKs</div><div style="background:#f5a524">AQs</div><div style="background:#f5a524">AJs</div><div style="background:#f5a524">ATs</div>
+              <div style="background:#f5a524">AKo</div><div style="background:#ef4444">KK</div><div style="background:#f5a524">KQs</div><div style="background:#f5a524">KJs</div><div style="background:#a78bfa">KTs</div>
+              <div style="background:#f5a524">AQo</div><div style="background:#f5a524">KQo</div><div style="background:#f5a524">QQ</div><div style="background:#f5a524">QJs</div><div style="background:#a78bfa">QTs</div>
+              <div style="background:#f5a524">AJo</div><div style="background:#a78bfa">KJo</div><div style="background:#202024;color:#5d5d66">QJo</div><div style="background:#f5a524">JJ</div><div style="background:#f5a524">JTs</div>
+              <div style="background:#a78bfa">ATo</div><div style="background:#202024;color:#5d5d66">KTo</div><div style="background:#202024;color:#5d5d66">QTo</div><div style="background:#202024;color:#5d5d66">JTo</div><div style="background:#f5a524">TT</div>
+            </div>
+          </div>
+        </div>
+        <span class="pk-btn" style="background:#f5a524; color:#1f1402;">Aplicar</span>
+      </div>
+    </div>
+    <div class="card-body"><h3>C · Grafito y ámbar</h3><p>Negro neutro con ámbar y violeta. Sobrio, tipo herramienta pro; los colores de acción resaltan mucho.</p></div>
+  </div>
+
+</div>
