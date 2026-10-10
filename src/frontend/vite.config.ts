@@ -25,5 +25,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // tokens.test.ts reads tokens.css?raw; vitest skips CSS files it does not include.
+    css: { include: [/tokens\.css/] },
   },
 })

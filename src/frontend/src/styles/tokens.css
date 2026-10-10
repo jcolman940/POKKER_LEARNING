@@ -1,0 +1,83 @@
+/* POKKER design tokens: "Paño y oro" (dark only). Spec: docs/superpowers/specs/2026-10-10-rediseno-ui-design.md §2.1 */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces and text */
+  --bg: #0d1a14;
+  --bg-deep: #0a140f;
+  --surface: #13261c;
+  --surface-2: #1c3527;
+  --line: #1f3a2b;
+  --line-strong: #2c4a39;
+  --text: #e8efe9;
+  --text-muted: #8fa898;
+  --text-dim: #4d6b58;
+
+  /* Accent and states */
+  --gold: #d9b45a;
+  --gold-ink: #1a1406;
+  --danger: #c2524a;
+  --on-danger: #ffffff;
+  --ok: #2f9e63;
+  --info: #4a8fd1;
+  --warn: #e0a84a;
+  --positive: #4cc38a;
+  --negative: #e0736b;
+
+  /* Poker table (simulator, part 3) */
+  --felt: #1f6b45;
+  --felt-edge: #0f3d28;
+  --rail: #3a2a16;
+
+  /* Range matrix: text on filled cells and colour per action */
+  --matrix-ink: #0b1510;
+  --grid-empty: #1a2e23;
+  --action-raise: #2f9e63;
+  --action-limp: #7fb69a;
+  --action-call: #4a8fd1;
+  --action-3bet: #9b6bd6;
+  --action-4bet: #d07a3a;
+  --action-5bet: #c96a4f;
+  --action-allin: #d4625a;
+  --action-fold: #1a2e23;
+  --action-check: var(--action-call);
+  --action-bet: var(--action-raise);
+
+  /* Playing cards: light face, four-colour deck */
+  --card-bg: #f7f3ea;
+  --suit-s: #1b1f1d;
+  --suit-h: #c62828;
+  --suit-d: #1565c0;
+  --suit-c: #2e7d32;
+
+  /* Winnings chart series */
+  --series-total: #4cc38a;
+  --series-showdown: #4a8fd1;
+  --series-nonshowdown: #e0736b;
+  --series-ev: #c3c2b7;
+
+  /* Legacy names still used by older sections */
+  --muted: var(--text-muted);
+  --border: var(--line-strong);
+  --accent: var(--gold);
+  --on-accent: var(--gold-ink);
+
+  /* Spacing, radii, type */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-box: 12px;
+  --font: 'Segoe UI', system-ui, sans-serif;
+  --sidebar-width: 170px;
+  --sidebar-width-collapsed: 48px;
+
+  font-family: var(--font);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
