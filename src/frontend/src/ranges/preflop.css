@@ -1,0 +1,99 @@
+.preflop-page,
+.preflop-filters,
+.preflop-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.preflop-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.preflop-filter-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.preflop-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.preflop-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.preflop-body {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 200px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.preflop-left,
+.preflop-center,
+.preflop-right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.preflop-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preflop-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preflop-legend .preflop-legend-pct {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.preflop-missing {
+  align-items: flex-start;
+}
+
+.preflop-right .ui-card p {
+  margin: 0;
+}
+
+.preflop-links {
+  align-items: flex-start;
+}
+
+@media (max-width: 1100px) {
+  .preflop-body {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .preflop-right {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .preflop-filter-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
