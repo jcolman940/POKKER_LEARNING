@@ -1,0 +1,22 @@
+.ui-select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ui-select-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ui-select select {
+  background: var(--gold);
+  color: var(--gold-ink);
+  border: none;
+  border-radius: var(--radius-control);
+  padding: 7px 12px;
+  font-weight: 800;
+}
