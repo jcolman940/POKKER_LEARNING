@@ -44,6 +44,13 @@ describe('seats', () => {
     expect(seats.every((s) => s.stack_bb === 40)).toBe(true)
   })
 
+  it('never turns a rival into you when the hero seat disappears, and starts you without a bet', () => {
+    const seats = seatsFor(SIX, [seat('UTG+2', 'hero'), seat('BTN', 'villain', { bet_bb: 6, range: 'QQ+' })], 100)
+    expect(seats.find((s) => s.position === 'BTN')).toMatchObject({ role: 'villain', bet_bb: 6, range: 'QQ+' })
+    expect(heroSeat(seats)).toMatchObject({ bet_bb: 0, hand: null })
+    expect(heroSeat(seats)?.position).not.toBe('BTN')
+  })
+
   it('uses the default stack for new seats', () => {
     expect(seatsFor(SIX, [], 40).find((s) => s.position === 'CO')?.stack_bb).toBe(40)
   })
@@ -133,7 +140,8 @@ describe('tableToScenario', () => {
       board: 'Kh7c2d',
       pot_bb: 14.5,
       to_call_bb: 4,
-      effective_stack_bb: 93,
+      // stacks include the current bet; the API gets what is left behind (96 vs 93 − 4)
+      effective_stack_bb: 89,
       previous_action: 'CO bet 4, BTN call 4',
       stacks_bb: {},
       payouts: [],
@@ -155,6 +163,16 @@ describe('tableToScenario', () => {
     expect(s.pot_bb).toBe(22.5)
     expect(s.to_call_bb).toBe(8)
     expect(s.previous_action).toBe('CO bet 12, BB call 4')
+  })
+
+  it('caps what you face at what you have left after your own bet', () => {
+    // you had 50, 3-bet to 20, the rival jams for 100
+    const t = makeTable({
+      seats: [seat('BTN', 'hero', { stack_bb: 50, bet_bb: 20 }), seat('BB', 'villain', { stack_bb: 150, bet_bb: 100 })],
+    })
+    const s = tableToScenario(t)
+    expect(s.to_call_bb).toBe(30)
+    expect(s.effective_stack_bb).toBe(30)
   })
 
   it('caps what you face at your stack (short all-in)', () => {
@@ -295,6 +313,32 @@ describe('tableFromInitial', () => {
     expect(s.to_call_bb).toBe(4)
     expect(s.previous_action).toBe('BTN abre 2.5bb; BB paga; BTN apuesta 4')
     expect(s.villains).toEqual([{ position: 'BTN', range: '22+,A2s+', hand: null }])
+  })
+
+  it('keeps a replayer spot analyzable when the rival bet more than the effective stack', () => {
+    const base = {
+      format: 'cash' as const,
+      num_players: 6,
+      hero_position: 'BB',
+      hero_hand: 'AhKs',
+      villains: [{ position: 'BTN', range: 'random', hand: null }],
+      board: 'Kh7c2d',
+    }
+    // rival all-in for 93: nothing behind, effective 0
+    const allIn = tableFromInitial(
+      { ...base, pot_bb: 101, to_call_bb: 93, effective_stack_bb: 0, stacks_bb: { BB: 100, BTN: 0 } },
+      defaultTable(null),
+    )
+    expect(validateTable(allIn)).toBeNull()
+    expect(tableToScenario(allIn)).toMatchObject({ pot_bb: 101, to_call_bb: 93, effective_stack_bb: 0 })
+
+    // rival bets 60 with 40 behind; you have 100
+    const big = tableFromInitial(
+      { ...base, pot_bb: 70, to_call_bb: 60, effective_stack_bb: 40, stacks_bb: { BB: 100, BTN: 40 } },
+      defaultTable(null),
+    )
+    expect(validateTable(big)).toBeNull()
+    expect(tableToScenario(big)).toMatchObject({ pot_bb: 70, to_call_bb: 60, effective_stack_bb: 40 })
   })
 
   it('never seats a rival on the hero position', () => {

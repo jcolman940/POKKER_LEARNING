@@ -4,10 +4,9 @@ Detalles detectados en las revisiones finales de la fase 8 que quedaron sin reso
 
 ## Hoja de ruta
 
-1. **Fase 8, parte 3: Simulador con mesa ovalada** (spec `docs/superpowers/specs/2026-10-10-rediseno-ui-design.md` §5). Incluye que el Simulador lea los filtros guardados de Preflop (`localStorage` `pokker.preflop.filters`) para arrancar con 6 o 9 asientos.
-2. **Parsers de GGPoker y PokerStars:** esperan una historia de manos real de un torneo.
-3. **Diferidos del entrenador:** racha y meta diaria, y un explicador conversacional con LLM (spec fase 6 §9).
-4. **`POKKER.exe` en la raíz del repo:** quedó postergado. La complejidad es que el exe necesita las piezas armadas de `app\`, y el actualizador reescribiría archivos versionados. La idea preferida es un exe de arranque que instale y actualice la app en `%LOCALAPPDATA%`.
+1. **Parsers de GGPoker y PokerStars:** esperan una historia de manos real de un torneo.
+2. **Diferidos del entrenador:** racha y meta diaria, y un explicador conversacional con LLM (spec fase 6 §9).
+3. **`POKKER.exe` en la raíz del repo:** quedó postergado. La complejidad es que el exe necesita las piezas armadas de `app\`, y el actualizador reescribiría archivos versionados. La idea preferida es un exe de arranque que instale y actualice la app en `%LOCALAPPDATA%`.
 
 ## Fase 8, parte 1: base visual
 
@@ -33,3 +32,13 @@ Detalles detectados en las revisiones finales de la fase 8 que quedaron sin reso
 - **Copiar rango:** incluye una línea "Fold" si el rango tiene esa capa guardada, aunque las estadísticas no cuentan el fold.
 - **Formato guardado desconocido:** si el filtro guardado tiene un formato fuera de los 4 conocidos (solo con datos corruptos), la tarjeta Juego queda sin ninguna opción marcada.
 - **Posiciones fuera de la lista del Entrenador:** si un rango usa posiciones que el Entrenador no lista (por ejemplo "EP" o "MP"), "Entrenar este spot" le pasa un filtro que no se ve.
+
+## Fase 8, parte 3: Simulador con mesa
+
+- **Acción previa:** se arma en orden preflop en todas las calles. En el flop, "BB bet 4, BTN raise 12" se lee "BTN bet 12, BB call 4". El backend no la usa: solo afecta el texto de ejemplo y lo que se envía.
+- **Stack 0:** pasa la validación, pero en torneos el backend lo rechaza ("Los stacks deben ser positivos"). Además, si se vacía "Stack efectivo por defecto", todos los asientos quedan en 0, y editar ese campo pisa los stacks por asiento que hubiera para ICM.
+- **Aviso de push/fold:** en torneos ya no aparece "Sin stacks por posición…", porque ahora siempre se mandan los stacks de los asientos (aunque sean los 100 por defecto).
+- **Cartas de un rival:** elegir una cierra el popover del asiento (el clic en el selector de cartas cuenta como clic afuera), así que para la segunda carta hay que volver a abrirlo.
+- **Selector de cartas:** bloquea las cartas del board que no están en juego en la calle actual (por ejemplo, el turn guardado mientras estás en el flop).
+- **`isTableState` es laxa:** no controla que `num_players` esté entre 2 y 10, que los premios sean números ni que haya asientos.
+- **Analizar mientras cargan las posiciones:** justo después de cambiar la cantidad de jugadores, Analizar puede mandar los asientos viejos y el backend responde "Posición X no existe".

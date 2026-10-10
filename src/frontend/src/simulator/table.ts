@@ -56,8 +56,11 @@ export function seatsFor(positions: string[], previous: Seat[], defaultStack: nu
   const byPosition = new Map(previous.map((s) => [s.position, s]))
   const seats = positions.map((p) => byPosition.get(p) ?? newSeat(p, defaultStack))
   if (!seats.some((s) => s.role === 'hero')) {
-    const i = Math.max(0, positions.indexOf('BTN'))
-    seats[i] = { ...seats[i], role: 'hero', hand: null }
+    // BTN unless a rival sits there: never turn a rival into you; you start without a bet.
+    let i = positions.indexOf('BTN')
+    if (i < 0 || seats[i].role === 'villain') i = seats.findIndex((s) => s.role !== 'villain')
+    if (i < 0) i = Math.max(0, positions.indexOf('BTN'))
+    seats[i] = { ...seats[i], role: 'hero', hand: null, bet_bb: 0 }
   }
   return seats
 }
@@ -114,6 +117,8 @@ export function boardForStreet(board: string, street: Street): string {
 }
 
 const inPlay = (s: Seat) => s.role !== 'empty'
+/** A seat's stack includes its current bet; the API wants what is left behind (as the replayer sends it). */
+const behind = (s: Seat) => Math.max(0, s.stack_bb - s.bet_bb)
 
 export function totalPot(t: TableState): number {
   return round2(t.pot_bb + t.seats.filter(inPlay).reduce((sum, s) => sum + s.bet_bb, 0))
@@ -147,7 +152,7 @@ export function previousActionFrom(t: TableState): string {
 export function tableToScenario(t: TableState): ScenarioInput {
   const hero = heroSeat(t.seats)
   const villains = villainSeats(t.seats)
-  const heroStack = hero?.stack_bb ?? 0
+  const heroBehind = hero ? behind(hero) : 0
   const topBet = Math.max(0, ...t.seats.filter(inPlay).map((s) => s.bet_bb))
   const tournament = t.format !== 'cash'
   return {
@@ -158,13 +163,13 @@ export function tableToScenario(t: TableState): ScenarioInput {
     villains: villains.map((v) => ({ position: v.position, range: v.range, hand: v.hand })),
     board: boardForStreet(t.board, t.street),
     pot_bb: totalPot(t),
-    to_call_bb: round2(Math.min(heroStack, Math.max(0, topBet - (hero?.bet_bb ?? 0)))),
-    effective_stack_bb: villains.length ? Math.min(heroStack, Math.max(...villains.map((v) => v.stack_bb))) : heroStack,
+    to_call_bb: round2(Math.min(heroBehind, Math.max(0, topBet - (hero?.bet_bb ?? 0)))),
+    effective_stack_bb: round2(villains.length ? Math.min(heroBehind, Math.max(...villains.map(behind))) : heroBehind),
     previous_action: previousActionFrom(t),
     situation: t.advanced.situation,
     ante_bb: t.advanced.ante_bb,
     bb_ante_bb: t.advanced.bb_ante_bb,
-    stacks_bb: tournament ? Object.fromEntries(t.seats.filter(inPlay).map((s) => [s.position, s.stack_bb])) : {},
+    stacks_bb: tournament ? Object.fromEntries(t.seats.filter(inPlay).map((s) => [s.position, behind(s)])) : {},
     payouts: tournament ? t.advanced.payouts : [],
     hero_range: t.advanced.hero_range || null,
     ranges_approximate: t.advanced.ranges_approximate,
@@ -225,9 +230,13 @@ export function tableFromInitial(i: Partial<ScenarioInput>, base: TableState): T
     if (!v.position || v.position === heroPos || seats.some((s) => s.position === v.position)) continue
     seats.push({ ...newSeat(v.position, stackOf(v.position)), role: 'villain', range: v.range || 'random', hand: v.hand ?? null })
   }
+  // The replayer sends stacks left behind; the bet goes back into the rival's stack (stack = behind + bet).
   const toCall = i.to_call_bb ?? 0
   const firstRival = seats.find((s) => s.role === 'villain')
-  if (firstRival && toCall > 0) firstRival.bet_bb = toCall
+  if (firstRival && toCall > 0) {
+    firstRival.bet_bb = toCall
+    firstRival.stack_bb = round2(firstRival.stack_bb + toCall)
+  }
   const board = i.board ?? ''
   const pot = i.pot_bb ?? (board === '' ? 1.5 : base.pot_bb)
   return {

@@ -163,6 +163,12 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Simulador' })).toHaveAttribute('aria-current', 'page')
     expect(await screen.findByRole('button', { name: /^CO · Vos/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^BB · Rival/ })).toBeInTheDocument()
+
+    // edits survive leaving the simulator and coming back from the menu
+    fireEvent.change(screen.getByLabelText('Pozo (bb)'), { target: { value: '9' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Preflop' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Simulador' }))
+    expect(screen.getByLabelText('Pozo (bb)')).toHaveValue(9)
     window.localStorage.clear()
   })
 })

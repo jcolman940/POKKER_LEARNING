@@ -69,7 +69,11 @@ export default function App() {
       )}
       <Sidebar
         current={section}
-        onSelect={setSection}
+        onSelect={(id) => {
+          // A spot from the replayer or Preflop applies once; the menu reopens the saved table.
+          if (id === 'simulator') setSpot(null)
+          setSection(id)
+        }}
         collapsed={collapsed}
         onToggle={toggleSidebar}
         status={
