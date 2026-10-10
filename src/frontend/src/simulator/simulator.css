@@ -1,27 +1,66 @@
 /* ---- Layout ---- */
 .simulator {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--space-5);
   align-items: start;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1100px) {
   .simulator {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.sim-config,
+.sim-main,
+.sim-side,
 .results {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.sim-results {
+.sim-main {
+  overflow-x: auto;
+}
+
+.sim-side {
   position: sticky;
-  top: 16px;
+  top: var(--space-4);
+}
+
+.sim-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.sim-config {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sim-config-pop {
+  top: 36px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sim-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.sim-advanced summary {
+  cursor: pointer;
+  font-weight: 700;
 }
 
 /* ---- Results ---- */

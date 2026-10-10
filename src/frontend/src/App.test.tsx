@@ -161,8 +161,8 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preflop' }))
     fireEvent.click(await screen.findByRole('button', { name: /Abrir en Simulador/ }))
     expect(screen.getByRole('button', { name: 'Simulador' })).toHaveAttribute('aria-current', 'page')
-    // Hero and each rival have a "Posición" select; the hero one is #hero-pos.
-    await waitFor(() => expect(document.getElementById('hero-pos')).toHaveValue('CO'))
+    expect(await screen.findByRole('button', { name: /^CO · Vos/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^BB · Rival/ })).toBeInTheDocument()
     window.localStorage.clear()
   })
 })

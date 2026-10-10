@@ -1,89 +1,70 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getJson, postJson } from '../api/client'
-import { CardPicker } from './CardPicker'
-import { CardView } from './CardView'
+import { readStored, writeStored } from '../app/storage'
+import { isPreflopFilters, PREFLOP_FILTERS_KEY, type PreflopFilters } from '../ranges/preflopFilters'
 import { fetchSolverStatus, prefillRanges } from '../solver/api'
-import { PostflopSolverFields } from './PostflopSolverFields'
-import { RangeEditor } from './RangeEditor'
-import { ResultsPanel } from './ResultsPanel'
-import { SITUATIONS } from '../ranges/labels'
+import { Button, Chip, PillGroup, Popover } from '../ui'
+import { AdvancedPanel } from './AdvancedOptions'
+import { CardPicker } from './CardPicker'
 import { joinSlots, type Slot, toSlots } from './cards'
+import { PostflopSolverFields } from './PostflopSolverFields'
+import { ResultsPanel } from './ResultsPanel'
+import { SeatPopover } from './SeatPopover'
+import {
+  BOARD_CARDS,
+  boardForStreet,
+  defaultTable,
+  heroSeat,
+  isTableState,
+  previousActionFrom,
+  seatsFor,
+  setRole,
+  SIM_TABLE_KEY,
+  STREET_LABEL,
+  streetFromBoard,
+  tableFromInitial,
+  type TableState,
+  tableToScenario,
+  updateSeat,
+  validateTable,
+  villainSeats,
+} from './table'
+import { type CardSlotRef, sameSlot } from './slots'
+import { TableView } from './TableView'
 import type { Analysis, DealRequest, DealResult, GameFormat, ScenarioInput, Street } from './types'
 
-interface VillainState {
-  position: string | null
-  range: string
-  hand: Slot[]
-  dealHand: boolean
-}
-
-type SlotGroup = 'hero' | 'board' | number // number = villain index
-interface ActiveSlot {
-  group: SlotGroup
-  index: number
-}
-
-const MAX_PLAYERS = 10
-const BOARD_LABELS = ['Flop 1', 'Flop 2', 'Flop 3', 'Turn', 'River']
-
-function newVillain(position: string | null = null): VillainState {
-  return { position, range: 'random', hand: [null, null], dealHand: false }
-}
-
-function parseAmount(value: string): number {
-  const n = Number(value)
-  return Number.isFinite(n) && n >= 0 ? n : 0
-}
-
-const STREET_BY_BOARD: Street[] = ['preflop', 'preflop', 'preflop', 'flop', 'turn', 'river']
-
-/** A scenario to start from (e.g. a spot sent by the hand replayer). */
+/** A scenario to start from (e.g. a spot sent by the hand replayer or Preflop). */
 export type InitialScenario = Partial<ScenarioInput>
 
+const FORMAT_LABEL: Record<GameFormat, string> = { cash: 'Cash', mtt: 'Torneo (MTT)', sng: 'Sit & Go', spin: 'Spin & Go' }
+const STREETS: Street[] = ['preflop', 'flop', 'turn', 'river']
+const MAX_PLAYERS = 10
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const storedFilters = (v: unknown): v is PreflopFilters | null => v === null || isPreflopFilters(v)
+
+function initialTable(initial?: InitialScenario): TableState {
+  const base = defaultTable(readStored<PreflopFilters | null>(PREFLOP_FILTERS_KEY, null, storedFilters))
+  if (initial) return tableFromInitial(initial, base)
+  return readStored(SIM_TABLE_KEY, base, isTableState)
+}
+
 export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
-  const [format, setFormat] = useState<GameFormat>(initial?.format ?? 'cash')
-  const [numPlayers, setNumPlayers] = useState(initial?.num_players ?? 6)
-  const [positions, setPositions] = useState<string[]>([])
-  const [heroPosition, setHeroPosition] = useState<string | null>(
-    initial ? (initial.hero_position ?? null) : 'BTN',
-  )
-  const [villains, setVillains] = useState<VillainState[]>(() =>
-    initial?.villains?.length
-      ? initial.villains.map((v) => ({
-          position: v.position,
-          range: v.range,
-          hand: toSlots(v.hand, 2),
-          dealHand: false,
-        }))
-      : [newVillain('BB')],
-  )
-  const [heroSlots, setHeroSlots] = useState<Slot[]>(() => toSlots(initial?.hero_hand, 2))
-  const [boardSlots, setBoardSlots] = useState<Slot[]>(() => toSlots(initial?.board, 5))
-  const [street, setStreet] = useState<Street>(
-    initial ? STREET_BY_BOARD[(initial.board ?? '').length / 2] ?? 'flop' : 'flop',
-  )
-  const [pot, setPot] = useState(String(initial?.pot_bb ?? 6.5))
-  const [toCall, setToCall] = useState(String(initial?.to_call_bb ?? 0))
-  const [stack, setStack] = useState(String(initial?.effective_stack_bb ?? 100))
-  const [previousAction, setPreviousAction] = useState(initial?.previous_action ?? '')
-  const [situation, setSituation] = useState<string>(initial?.situation ?? '')
-  const [ante, setAnte] = useState(String(initial?.ante_bb ?? 0))
-  const [bbAnte, setBbAnte] = useState(String(initial?.bb_ante_bb ?? 0))
-  const [stacksByPos, setStacksByPos] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.entries(initial?.stacks_bb ?? {}).map(([k, v]) => [k, String(v)])),
-  )
-  const [payouts, setPayouts] = useState((initial?.payouts ?? []).join(', '))
-  const [active, setActive] = useState<ActiveSlot | null>(null)
+  const [table, setTable] = useState<TableState>(() => initialTable(initial))
+  const [selected, setSelected] = useState<string | null>(null)
+  const [active, setActive] = useState<CardSlotRef | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [heroRange, setHeroRange] = useState(initial?.hero_range ?? '')
-  const [rangesApprox, setRangesApprox] = useState(initial?.ranges_approximate ?? false)
-  const [prefillNotes, setPrefillNotes] = useState<string[]>([])
-  const [preset, setPreset] = useState(initial?.solver_preset ?? 'chico')
   const [presets, setPresets] = useState<{ name: string; label: string }[]>([])
+  const [prefillNotes, setPrefillNotes] = useState<string[]>([])
   const [potType, setPotType] = useState<'srp' | '3bet'>('srp')
   const [aggressor, setAggressor] = useState<'hero' | 'villain'>('villain')
+  const [configOpen, setConfigOpen] = useState(false)
+  const configAnchor = useRef<HTMLButtonElement>(null)
+  const closeConfig = useCallback(() => setConfigOpen(false), [])
+  const closeSeat = useCallback(() => setSelected(null), [])
+
+  useEffect(() => writeStored(SIM_TABLE_KEY, table), [table])
 
   useEffect(() => {
     fetchSolverStatus()
@@ -93,180 +74,130 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
 
   useEffect(() => {
     const controller = new AbortController()
-    getJson<string[]>(`/api/simulator/positions/${numPlayers}`, controller.signal)
-      .then((names) => {
-        setPositions(names)
-        setHeroPosition((p) => (p && names.includes(p) ? p : null))
-        setVillains((vs) =>
-          vs
-            .slice(0, numPlayers - 1)
-            .map((v) => ({ ...v, position: v.position && names.includes(v.position) ? v.position : null })),
-        )
-      })
+    getJson<string[]>(`/api/simulator/positions/${table.num_players}`, controller.signal)
+      .then((names) =>
+        setTable((t) => ({
+          ...t,
+          seats: seatsFor(
+            names,
+            t.seats.filter((s) => names.includes(s.position)),
+            heroSeat(t.seats)?.stack_bb ?? 100,
+          ),
+        })),
+      )
       .catch(() => {
-        if (!controller.signal.aborted) setPositions([])
+        // Without the position list the table keeps the seats it has.
       })
     return () => controller.abort()
-  }, [numPlayers])
+  }, [table.num_players])
 
-  const used = useMemo(() => {
-    const all = [...heroSlots, ...boardSlots, ...villains.flatMap((v) => v.hand)]
-    return new Set(all.filter((c): c is string => c !== null))
-  }, [heroSlots, boardSlots, villains])
+  const used = useMemo(
+    () => new Set([table.hero_hand, table.board, ...table.seats.map((s) => s.hand ?? '')].join('').match(/.{2}/g) ?? []),
+    [table],
+  )
 
-  const villainLabels = villains.map((v, i) => `Rival ${i + 1}${v.position ? ` (${v.position})` : ''}`)
-
-  function slotsOf(group: SlotGroup): Slot[] {
-    if (group === 'hero') return heroSlots
-    if (group === 'board') return boardSlots
-    return villains[group].hand
-  }
-
-  function setSlot(group: SlotGroup, index: number, card: Slot) {
-    const next = [...slotsOf(group)]
-    next[index] = card
-    if (group === 'hero') setHeroSlots(next)
-    else if (group === 'board') setBoardSlots(next)
-    else setVillains((vs) => vs.map((v, i) => (i === group ? { ...v, hand: next } : v)))
-  }
-
-  function updateVillain(index: number, patch: Partial<VillainState>) {
-    setVillains((vs) => vs.map((v, i) => (i === index ? { ...v, ...patch } : v)))
-  }
-
-  function renderSlots(group: SlotGroup, labels: string[]) {
-    return (
-      <div className="card-slots">
-        {slotsOf(group).map((card, index) => (
-          <CardView
-            key={index}
-            card={card}
-            label={labels[index]}
-            active={active?.group === group && active.index === index}
-            onClick={() =>
-              setActive((a) => (a?.group === group && a.index === index ? null : { group, index }))
-            }
-          />
-        ))}
-      </div>
-    )
+  function setSlot(slot: CardSlotRef, card: Slot) {
+    const { index } = slot
+    if (slot.group === 'seat') {
+      const { position } = slot
+      setTable((t) => {
+        const s = toSlots(t.seats.find((x) => x.position === position)?.hand, 2)
+        s[index] = card
+        return { ...t, seats: updateSeat(t.seats, position, { hand: joinSlots(s) || null }) }
+      })
+    } else if (slot.group === 'hero') {
+      setTable((t) => {
+        const s = toSlots(t.hero_hand, 2)
+        s[index] = card
+        return { ...t, hero_hand: joinSlots(s) }
+      })
+    } else {
+      setTable((t) => {
+        const s = toSlots(t.board, 5)
+        s[index] = card
+        return { ...t, board: joinSlots(s) }
+      })
+    }
   }
 
   async function deal(clearFirst: boolean) {
     setError(null)
-    const hero = clearFirst ? [] : heroSlots
-    const board = clearFirst ? [] : boardSlots
+    const villains = villainSeats(table.seats)
     const request: DealRequest = {
-      street,
-      hero_hand: joinSlots(hero),
-      board: joinSlots(board),
-      villain_hands: villains.map((v) => (clearFirst ? null : joinSlots(v.hand) || null)),
-      deal_villains: villains.flatMap((v, i) => (v.dealHand ? [i] : [])),
+      street: table.street,
+      hero_hand: clearFirst ? '' : table.hero_hand,
+      board: clearFirst ? '' : boardForStreet(table.board, table.street),
+      villain_hands: villains.map((v) => (clearFirst ? null : v.hand)),
+      deal_villains: [],
     }
     try {
-      const result = await postJson<DealResult>('/api/simulator/deal', request)
-      setHeroSlots(toSlots(result.hero_hand, 2))
-      setBoardSlots(toSlots(result.board, 5))
-      setVillains((vs) => vs.map((v, i) => ({ ...v, hand: toSlots(result.villain_hands[i], 2) })))
+      const r = await postJson<DealResult>('/api/simulator/deal', request)
+      setTable((t) => {
+        let seats = t.seats
+        villainSeats(t.seats).forEach((v, i) => {
+          seats = updateSeat(seats, v.position, { hand: r.villain_hands[i] ?? null })
+        })
+        return { ...t, hero_hand: r.hero_hand, board: r.board, street: r.board ? streetFromBoard(r.board) : t.street, seats }
+      })
       setActive(null)
       setAnalysis(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(message(e))
     }
   }
 
-  const isTournament = format !== 'cash'
-  const payoutList = payouts
-    .split(/[,;\s]+/)
-    .filter(Boolean)
-    .map(Number)
-    .filter((n) => Number.isFinite(n) && n >= 0)
+  const problem = validateTable(table)
 
   async function analyze() {
+    if (validateTable(table)) return
     setError(null)
-    const heroHand = joinSlots(heroSlots)
-    if (heroHand.length !== 4) {
-      setError('Elegí las dos cartas de Hero (o generalas al azar).')
-      return
-    }
-    const scenario: ScenarioInput = {
-      format,
-      num_players: numPlayers,
-      hero_position: heroPosition,
-      hero_hand: heroHand,
-      villains: villains.map((v) => ({
-        position: v.position,
-        range: v.range,
-        hand: joinSlots(v.hand) || null,
-      })),
-      board: joinSlots(boardSlots),
-      pot_bb: parseAmount(pot),
-      to_call_bb: parseAmount(toCall),
-      effective_stack_bb: parseAmount(stack),
-      previous_action: previousAction,
-      situation: situation || null,
-      ante_bb: parseAmount(ante),
-      bb_ante_bb: parseAmount(bbAnte),
-      stacks_bb: isTournament
-        ? Object.fromEntries(
-            Object.entries(stacksByPos)
-              .filter(([p, v]) => positions.includes(p) && v.trim() !== '')
-              .map(([p, v]) => [p, parseAmount(v)]),
-          )
-        : {},
-      payouts: isTournament ? payoutList : [],
-      hero_range: heroRange || null,
-      ranges_approximate: rangesApprox,
-      solver_preset: preset,
-    }
     setBusy(true)
     try {
-      setAnalysis(await postJson<Analysis>('/api/simulator/analyze', scenario))
+      setAnalysis(await postJson<Analysis>('/api/simulator/analyze', tableToScenario(table)))
     } catch (e) {
       setAnalysis(null)
-      setError(e instanceof Error ? e.message : String(e))
+      setError(message(e))
     } finally {
       setBusy(false)
     }
   }
 
   async function prefill() {
-    const villainPos = villains[0]?.position
-    if (!heroPosition || !villainPos) {
-      setError('Indicá las posiciones de Hero y del Rival 1 para prellenar.')
+    const hero = heroSeat(table.seats)
+    const villain = villainSeats(table.seats)[0]
+    if (!hero || !villain) {
+      setError('Marcá tu asiento y un rival para prellenar.')
       return
     }
     setError(null)
-    const [aggr, caller] =
-      aggressor === 'hero' ? [heroPosition, villainPos] : [villainPos, heroPosition]
+    const [aggr, caller] = aggressor === 'hero' ? [hero.position, villain.position] : [villain.position, hero.position]
     try {
       const r = await prefillRanges({
-        game_format: format,
-        players: numPlayers,
+        game_format: table.format,
+        players: table.num_players,
         aggressor: aggr,
         caller,
         pot_type: potType,
-        stack_bb: parseAmount(stack),
-        ante_bb: parseAmount(ante),
+        stack_bb: tableToScenario(table).effective_stack_bb,
+        ante_bb: table.advanced.ante_bb,
       })
       const heroPart = aggressor === 'hero' ? r.aggressor : r.caller
       const villPart = aggressor === 'hero' ? r.caller : r.aggressor
-      if (heroPart.text) setHeroRange(heroPart.text)
-      if (villPart.text) updateVillain(0, { range: villPart.text })
       const missing = [heroPart.missing, villPart.missing].filter(Boolean) as string[]
-      setPrefillNotes([
-        ...heroPart.notes,
-        ...villPart.notes,
-        ...missing.map((m) => `Falta tabla: ${m}`),
-      ])
-      setRangesApprox(heroPart.approximate || villPart.approximate || missing.length > 0)
+      setTable((t) => ({
+        ...t,
+        seats: villPart.text ? updateSeat(t.seats, villain.position, { range: villPart.text }) : t.seats,
+        advanced: {
+          ...t.advanced,
+          hero_range: heroPart.text || t.advanced.hero_range,
+          ranges_approximate: heroPart.approximate || villPart.approximate || missing.length > 0,
+        },
+      }))
+      setPrefillNotes([...heroPart.notes, ...villPart.notes, ...missing.map((m) => `Falta tabla: ${m}`)])
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(message(e))
     }
   }
-
-  const showSolverFields =
-    boardSlots.filter((c) => c !== null).length >= 3 && villains.length === 1
 
   // Keep the latest analyze() reachable from the polling callback without re-arming its timer.
   const analyzeRef = useRef(analyze)
@@ -275,256 +206,175 @@ export function SimulatorPage({ initial }: { initial?: InitialScenario } = {}) {
   })
   const refreshAnalysis = useCallback(() => void analyzeRef.current(), [])
 
-  function positionSelect(id: string, value: string | null, onChange: (v: string | null) => void) {
-    return (
-      <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-        <option value="">Sin definir</option>
-        {positions.map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
-    )
-  }
+  const hero = heroSeat(table.seats)
+  const villains = villainSeats(table.seats)
+  const showSolverFields =
+    BOARD_CARDS[table.street] >= 3 && table.board.length / 2 >= 3 && villains.length === 1
 
   return (
     <div className="simulator">
-      <div className="sim-config">
-        <section className="panel" aria-labelledby="table-title">
-          <h3 id="table-title">Mesa</h3>
-          <div className="field-row">
-            <label>
-              Formato
-              <select value={format} onChange={(e) => setFormat(e.target.value as GameFormat)}>
-                <option value="cash">Cash</option>
-                <option value="mtt">Torneo (MTT)</option>
-                <option value="sng">Sit &amp; Go</option>
-                <option value="spin">Spin &amp; Go</option>
-              </select>
-            </label>
-            <label>
-              Jugadores
-              <select value={numPlayers} onChange={(e) => setNumPlayers(Number(e.target.value))}>
-                {Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2).map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="field-row">
-            <label>
-              Pote (bb)
-              <input type="number" min="0" step="0.5" value={pot} onChange={(e) => setPot(e.target.value)} />
-            </label>
-            <label>
-              A pagar (bb)
-              <input type="number" min="0" step="0.5" value={toCall} onChange={(e) => setToCall(e.target.value)} />
-            </label>
-            <label>
-              Stack efectivo (bb)
-              <input type="number" min="0" step="1" value={stack} onChange={(e) => setStack(e.target.value)} />
-            </label>
-          </div>
-          <p className="muted small">El pote incluye la apuesta que estás enfrentando.</p>
-          <div className="field-row">
-            <label>
-              Situación preflop
-              <select value={situation} onChange={(e) => setSituation(e.target.value)}>
-                <option value="">Sin definir</option>
-                {SITUATIONS.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Ante (bb)
-              <input type="number" min="0" step="0.01" value={ante} onChange={(e) => setAnte(e.target.value)} />
-            </label>
-            <label>
-              BB ante (bb)
-              <input type="number" min="0" step="0.1" value={bbAnte} onChange={(e) => setBbAnte(e.target.value)} />
-            </label>
-          </div>
-          <p className="muted small">Rival 1 es quien abrió, subió o fue all-in antes que vos.</p>
-          {isTournament && (
-            <details className="tournament">
-              <summary>Torneo: stacks por posición y premios (ICM)</summary>
-              <div className="stack-grid">
-                {positions.map((p) => (
-                  <label key={p}>
-                    {p}
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      placeholder={stack}
-                      value={stacksByPos[p] ?? ''}
-                      onChange={(e) => setStacksByPos((s) => ({ ...s, [p]: e.target.value }))}
-                    />
-                  </label>
-                ))}
-              </div>
+      <div className="sim-main">
+        <div className="sim-top">
+          <span className="sim-config">
+            <Chip>
+              {FORMAT_LABEL[table.format]} · {table.num_players}-max · {hero?.stack_bb ?? 100} bb
+            </Chip>
+            <button
+              ref={configAnchor}
+              type="button"
+              className="btn btn-ghost btn-sm"
+              aria-expanded={configOpen}
+              onClick={() => setConfigOpen((o) => !o)}
+            >
+              Cambiar
+            </button>
+            <Popover open={configOpen} onClose={closeConfig} anchorRef={configAnchor} label="Mesa" className="sim-config-pop">
               <label>
-                Premios que quedan (vacío = chip EV)
+                Formato
+                <select
+                  value={table.format}
+                  onChange={(e) => setTable((t) => ({ ...t, format: e.target.value as GameFormat }))}
+                >
+                  {(Object.keys(FORMAT_LABEL) as GameFormat[]).map((f) => (
+                    <option key={f} value={f}>
+                      {FORMAT_LABEL[f]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Jugadores
+                <select
+                  value={table.num_players}
+                  onChange={(e) => setTable((t) => ({ ...t, num_players: Number(e.target.value) }))}
+                >
+                  {Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Stack efectivo por defecto (bb)
                 <input
-                  type="text"
-                  value={payouts}
-                  onChange={(e) => setPayouts(e.target.value)}
-                  placeholder="Ej.: 50, 30, 20"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={hero?.stack_bb ?? 100}
+                  onChange={(e) => {
+                    const stack = Math.max(0, Number(e.target.value) || 0)
+                    setTable((t) => ({ ...t, seats: t.seats.map((s) => ({ ...s, stack_bb: stack })) }))
+                  }}
                 />
               </label>
-            </details>
+              <Button size="sm" onClick={closeConfig}>
+                Listo
+              </Button>
+            </Popover>
+          </span>
+          <PillGroup
+            legend="Calle"
+            options={STREETS.map((s) => ({ value: s, label: STREET_LABEL[s] }))}
+            value={table.street}
+            onChange={(street) => setTable((t) => ({ ...t, street }))}
+          />
+        </div>
+
+        <TableView
+          table={table}
+          selected={selected}
+          onSeatClick={(p) => setSelected((s) => (s === p ? null : p))}
+          activeSlot={active}
+          onSlotClick={(slot) => setActive((a) => (sameSlot(a, slot) ? null : slot))}
+          onPotChange={(pot_bb) => setTable((t) => ({ ...t, pot_bb }))}
+          renderSeatPanel={(seat, anchorRef, style) => (
+            <div className="sim-popover-anchor" style={style}>
+              <SeatPopover
+                seat={seat}
+                table={table}
+                anchorRef={anchorRef}
+                onClose={closeSeat}
+                onRole={(role) => setTable((t) => ({ ...t, seats: setRole(t.seats, seat.position, role) }))}
+                onChange={(patch) => setTable((t) => ({ ...t, seats: updateSeat(t.seats, seat.position, patch) }))}
+                activeSlot={active}
+                onSlotClick={(slot) => setActive((a) => (sameSlot(a, slot) ? null : slot))}
+              />
+            </div>
           )}
-          <label>
-            Acción previa
-            <input
-              type="text"
-              value={previousAction}
-              onChange={(e) => setPreviousAction(e.target.value)}
-              placeholder="Ej.: CO abre 2.5bb, BTN paga"
-            />
-          </label>
-        </section>
-
-        <section className="panel" aria-labelledby="hero-title">
-          <h3 id="hero-title">Hero</h3>
-          <div className="field-row">
-            <label htmlFor="hero-pos">Posición</label>
-            {positionSelect('hero-pos', heroPosition, setHeroPosition)}
-          </div>
-          {renderSlots('hero', ['Hero carta 1', 'Hero carta 2'])}
-        </section>
-
-        <section className="panel" aria-labelledby="board-title">
-          <h3 id="board-title">Board</h3>
-          {renderSlots('board', BOARD_LABELS)}
-        </section>
+        />
 
         {active && (
           <CardPicker
             used={used}
             onPick={(card) => {
-              setSlot(active.group, active.index, card)
+              setSlot(active, card)
               setActive(null)
             }}
             onClear={() => {
-              setSlot(active.group, active.index, null)
+              setSlot(active, null)
               setActive(null)
             }}
             onClose={() => setActive(null)}
           />
         )}
 
-        {villains.map((v, i) => (
-          <section key={i} className="panel" aria-labelledby={`villain-${i}-title`}>
-            <div className="panel-header">
-              <h3 id={`villain-${i}-title`}>Rival {i + 1}</h3>
-              {villains.length > 1 && (
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => setVillains((vs) => vs.filter((_, j) => j !== i))}
-                >
-                  Quitar
-                </button>
-              )}
-            </div>
-            <div className="field-row">
-              <label htmlFor={`villain-${i}-pos`}>Posición</label>
-              {positionSelect(`villain-${i}-pos`, v.position, (p) => updateVillain(i, { position: p }))}
-            </div>
-            <label htmlFor={`villain-${i}-range`}>Rango</label>
-            <RangeEditor
-              id={`villain-${i}-range`}
-              value={v.range}
-              onChange={(range) => updateVillain(i, { range })}
+        <div className="sim-actions">
+          <Button onClick={() => void deal(false)}>Completar al azar</Button>
+          <Button onClick={() => void deal(true)}>Todo al azar</Button>
+        </div>
+
+        <AdvancedPanel
+          table={table}
+          onChange={(advanced) => setTable((t) => ({ ...t, advanced }))}
+          autoAction={previousActionFrom({ ...table, advanced: { ...table.advanced, previous_action: '' } })}
+        >
+          {showSolverFields && (
+            <PostflopSolverFields
+              heroRange={table.advanced.hero_range}
+              onHeroRange={(v) => {
+                setTable((t) => ({ ...t, advanced: { ...t.advanced, hero_range: v, ranges_approximate: false } }))
+                setPrefillNotes([])
+              }}
+              preset={table.advanced.solver_preset}
+              onPreset={(v) => setTable((t) => ({ ...t, advanced: { ...t.advanced, solver_preset: v } }))}
+              presets={presets}
+              prefill={prefill}
+              prefillNotes={prefillNotes}
+              potType={potType}
+              onPotType={setPotType}
+              aggressor={aggressor}
+              onAggressor={setAggressor}
             />
-            <p className="field-label">Mano puntual (opcional, solo informativa)</p>
-            {renderSlots(i, [`Rival ${i + 1} carta 1`, `Rival ${i + 1} carta 2`])}
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={v.dealHand}
-                onChange={(e) => updateVillain(i, { dealHand: e.target.checked })}
-              />
-              Repartirle mano al azar
-            </label>
-          </section>
-        ))}
-        {villains.length < numPlayers - 1 && (
-          <button type="button" onClick={() => setVillains((vs) => [...vs, newVillain()])}>
-            Agregar rival
-          </button>
-        )}
+          )}
+        </AdvancedPanel>
+      </div>
 
-        {showSolverFields && (
-          <PostflopSolverFields
-            heroRange={heroRange}
-            onHeroRange={(v) => {
-              setHeroRange(v)
-              setRangesApprox(false)
-              setPrefillNotes([])
-            }}
-            preset={preset}
-            onPreset={setPreset}
-            presets={presets}
-            prefill={prefill}
-            prefillNotes={prefillNotes}
-            potType={potType}
-            onPotType={setPotType}
-            aggressor={aggressor}
-            onAggressor={setAggressor}
-          />
-        )}
-
-        <section className="panel actions" aria-label="Acciones">
-          <label>
-            Calle
-            <select value={street} onChange={(e) => setStreet(e.target.value as Street)}>
-              <option value="preflop">Preflop</option>
-              <option value="flop">Flop</option>
-              <option value="turn">Turn</option>
-              <option value="river">River</option>
-            </select>
-          </label>
-          <button type="button" onClick={() => void deal(false)}>
-            Completar al azar
-          </button>
-          <button type="button" onClick={() => void deal(true)}>
-            Todo al azar
-          </button>
-          <button type="button" className="primary" onClick={() => void analyze()} disabled={busy}>
-            {busy ? 'Calculando…' : 'Analizar'}
-          </button>
-        </section>
+      <aside className="sim-side" aria-live="polite">
+        <Button variant="primary" onClick={() => void analyze()} disabled={busy || problem !== null}>
+          {busy ? 'Calculando…' : 'Analizar'}
+        </Button>
+        {problem && <p className="muted small">{problem}</p>}
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
-      </div>
-
-      <div className="sim-results" aria-live="polite">
         {analysis ? (
           <ResultsPanel
             analysis={analysis}
-            villainLabels={villainLabels}
+            villainLabels={villains.map((v) => `Rival (${v.position})`)}
             onSolveDone={refreshAnalysis}
           />
         ) : (
           <section className="panel panel-muted">
             <p className="muted">
-              Armá el escenario (o generalo al azar) y tocá <strong>Analizar</strong>. La equity se
-              calcula siempre contra el rango del rival.
+              Armá la mesa: tocá un asiento para marcar rivales y apuestas, elegí tus cartas y el board, y tocá{' '}
+              <strong>Analizar</strong>. La equity se calcula siempre contra el rango del rival.
             </p>
           </section>
         )}
-      </div>
+      </aside>
     </div>
   )
 }
