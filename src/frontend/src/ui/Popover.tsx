@@ -17,6 +17,12 @@ const FOCUSABLE =
 /** Floating panel next to its anchor. The caller positions it through className. */
 export function Popover({ open, onClose, anchorRef, label, className, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  // Callers usually pass an inline arrow; reading it through a ref keeps the effect keyed
+  // on `open` only, so a parent re-render never moves focus while the user is typing.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
     if (!open) return
@@ -26,14 +32,14 @@ export function Popover({ open, onClose, anchorRef, label, className, children }
     function onMouseDown(e: MouseEvent) {
       const target = e.target as Node
       if (ref.current?.contains(target) || anchorRef.current?.contains(target)) return
-      onClose()
+      onCloseRef.current()
     }
     document.addEventListener('mousedown', onMouseDown)
     return () => {
       document.removeEventListener('mousedown', onMouseDown)
       anchor?.focus()
     }
-  }, [open, onClose, anchorRef])
+  }, [open, anchorRef])
 
   if (!open) return null
   return (

@@ -54,11 +54,18 @@
   font-size: clamp(0.5rem, 1.5vw, 0.7rem);
   font-weight: 700;
   color: var(--text-muted);
+  /* Mixed cells: the label sits half on the action colour and half on the dark fill. */
+  text-shadow:
+    0 0 3px var(--bg),
+    0 0 1px var(--bg);
   overflow: hidden;
 }
 
 .matrix-cell-on {
   color: var(--matrix-ink);
+  text-shadow:
+    0 0 3px rgb(255 255 255 / 0.6),
+    0 0 1px rgb(255 255 255 / 0.6);
 }
 
 button.matrix-cell {

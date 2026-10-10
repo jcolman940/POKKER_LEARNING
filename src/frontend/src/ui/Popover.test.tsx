@@ -20,7 +20,32 @@ function Harness() {
   )
 }
 
+function EditingHarness() {
+  const [open, setOpen] = useState(true)
+  const [stack, setStack] = useState('')
+  const anchor = useRef<HTMLButtonElement>(null)
+  return (
+    <div>
+      <button ref={anchor} type="button">
+        BTN
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchor} label="Asiento BTN">
+        <input aria-label="Apuesta" />
+        <input aria-label="Stack" value={stack} onChange={(e) => setStack(e.target.value)} />
+      </Popover>
+    </div>
+  )
+}
+
 describe('Popover', () => {
+  it('keeps focus where the user is typing when the parent re-renders', () => {
+    render(<EditingHarness />)
+    const stack = screen.getByRole('textbox', { name: 'Stack' })
+    stack.focus()
+    fireEvent.change(stack, { target: { value: '93' } })
+    expect(stack).toHaveFocus()
+  })
+
   it('opens as a labelled dialog and focuses its first control', () => {
     render(<Harness />)
     expect(screen.queryByRole('dialog')).toBeNull()

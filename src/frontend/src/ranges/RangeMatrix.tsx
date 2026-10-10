@@ -62,7 +62,9 @@ export function RangeMatrix({ layers, onPaint, detail, caption, implicitFold = t
         const extra = detail?.(i)
         const label = describe(layers, i, implicitFold) + (extra ? ` · ${extra}` : '')
         const style = { background: background(layers, i) }
-        const filled = layers.reduce((sum, { grid }) => sum + (grid[i] ?? 0), 0) >= 0.5
+        // Fold paints like an empty cell, so only played actions switch the label to the dark ink.
+        const filled =
+          layers.reduce((sum, { action, grid }) => sum + (action === 'fold' ? 0 : (grid[i] ?? 0)), 0) >= 0.5
         const className = [
           'matrix-cell',
           filled ? 'matrix-cell-on' : '',

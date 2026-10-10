@@ -83,7 +83,7 @@
 }
 
 .verdict-error .verdict {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .trainer-summary,

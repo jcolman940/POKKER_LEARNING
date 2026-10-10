@@ -107,7 +107,7 @@ input[type='number'] {
 
 .field-error,
 .error {
-  color: var(--danger);
+  color: var(--danger-text);
   margin: 4px 0;
 }
 
