@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.8.1] - 2026-10-11
+
+### Corregido
+- **Simulador:** la acción previa sigue el orden postflop (desde la SB; en heads-up, desde la BB). Un asiento en juego necesita stack mayor a 0, y el campo de stack por defecto solo mueve los asientos que seguían en el valor anterior. Elegir las cartas de un rival ya no cierra su asiento, y Escape cierra solo el selector. El selector bloquea solo las cartas del board de la calle actual, y Analizar espera a que carguen las posiciones al cambiar la cantidad de jugadores. En torneos, un all-in con stacks iguales se resuelve con los stacks reales.
+- **Preflop:** las acciones desconocidas tienen un color de respaldo en la matriz y la leyenda. Los mensajes se limpian al cambiar de pantalla, y el rango repetido que elegiste se conserva al editar. La matriz se recorre con el teclado (flechas) y muestra la mano enfocada. Copiar el rango deja afuera el fold, y "Entrenar este spot" funciona aunque el Entrenador no tenga esa posición.
+- **General:** la pestaña del navegador dice "Pokker Labs". Escape cierra los popovers aunque no tengan nada enfocable. El Entrenador pasa a una columna a 1030 px de ancho, el fold se ve en las barras de frecuencias, y los mensajes dicen "Preflop" en lugar de "Rangos preflop".
+
 ## [0.8.0] - 2026-10-10
 
 ### Cambiado
