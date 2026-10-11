@@ -36,7 +36,7 @@ def test_unknown_room_is_reported_not_fatal(client):
     report = upload(client, ("x.txt", b"some unknown text"))
     assert report["totals"]["imported"] == 0
     assert "No se reconoce la sala" in report["errors"][0]["message"]
-    assert client.get("/api/parsers").json() == []
+    assert client.get("/api/parsers").json() == [{"site": "ggpoker", "label": "GGPoker"}]
 
 
 def test_import_is_idempotent_and_reports_failures(client, fake_room):

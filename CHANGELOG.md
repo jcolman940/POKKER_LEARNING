@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased]
+
+### Agregado
+- **Importar historiales de torneos de GGPoker:** Manos, Estadísticas, Replayer y el leak finder ya funcionan con tus manos de GG. La hora de cada mano se toma como hora local de la PC.
+
 ## [0.8.1] - 2026-10-11
 
 ### Corregido

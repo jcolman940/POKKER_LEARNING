@@ -1,1 +1,2 @@
 src/backend/tests/fixtures/solver/*.txt text eol=lf
+tests/fixtures/hand_histories/**/*.txt -text

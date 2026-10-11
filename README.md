@@ -123,8 +123,10 @@ Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuen
 
 - **Importación** (`POST /api/imports`, pestaña *Historiales*): `.txt` y `.zip`, sala detectada por contenido
   (un parser por sala en `src/backend/app/parsers/`), idempotente por (sala, id de mano), tolerante a errores
-  con reporte de archivo/mano/línea. **Los parsers de GGPoker y PokerStars se escriben contra archivos
-  reales de muestra**: hasta tenerlos, ninguna sala está soportada.
+  con reporte de archivo/mano/línea. **Los parsers se escriben contra archivos reales de muestra**
+  (`tests/fixtures/hand_histories/`). Soportado: **GGPoker torneos** (MTT; la hora de cada mano se toma
+  como hora local de la PC). Pendientes hasta tener muestras: PokerStars y GGPoker cash. Los historiales de
+  GG no traen inscripción, puesto ni premio, así que ROI e ITM necesitan los resúmenes de torneo.
 - **Modelo normalizado** `HandRecord` (`src/backend/app/domain/hand.py`): lo producen los parsers y lo consumen
   estadísticas, replayer y entrenador/leak finder (fase 6).
 - **Estadísticas** (`/api/stats`): VPIP, PFR, 3-bet, fold to 3-bet, c-bet flop/turn, fold to c-bet, WTSD, W$SD,
@@ -216,7 +218,7 @@ diferencias) y, en torneos con ≤ 15bb en RFI o vs all-in, con el Nash de push/
 clase de mano se calcula la frecuencia esperada; es un leak si n ≥ `POKER_LEAKS_MIN_SAMPLE` (50), la
 esperada queda fuera del IC 95 % de Wilson y |diferencia| ≥ 5 puntos. El impacto se estima en bb/100
 (push/fold, pérdida de EV exacta) o pts/100 (tablas). "Entrenar este spot" abre el entrenador filtrado.
-Necesita manos importadas (los parsers de GGPoker y PokerStars esperan archivos reales).
+Necesita manos importadas (por ahora, torneos de GGPoker).
 
 **Limitaciones.**
 - Sin spots postflop ni spots de tu propio historial en el entrenador por ahora.
