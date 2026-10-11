@@ -176,3 +176,57 @@ def test_import_endpoint_reads_the_samples(db_session):
     assert report.totals["imported"] == 133
     _, again = import_files(db_session, files)
     assert again.totals["duplicates"] == 133
+
+
+SUMMARY_CLASSIC = SAMPLES / "summary-daily-classic.txt"
+SUMMARY_HYPER = SAMPLES / "summary-daily-hyper.txt"
+
+
+def test_tournament_summary():
+    s = parser.parse_summary(SUMMARY_HYPER.read_text(encoding="utf-8"))
+    assert s is not None
+    assert (s.site, s.tournament_id, s.game_type) == ("ggpoker", "317487008", GameFormat.MTT)
+    assert (s.buy_in, s.fee, s.currency) == (2.76, 0.24, "USD")
+    assert (s.finish, s.prize, s.entrants) == (70, 10.93, 1734)
+    assert s.played_at == datetime(2026, 10, 10, 14, 45).astimezone()
+
+    out = parser.parse_summary(SUMMARY_CLASSIC.read_text(encoding="utf-8"))
+    assert (out.finish, out.prize, out.entrants, out.buy_in) == (833, 0, 1333, 1.84)
+
+
+def test_hand_files_are_not_summaries():
+    assert parser.parse_summary(CLASSIC.read_text(encoding="utf-8")) is None
+    assert parser.parse_summary("some unknown text") is None
+
+
+def test_broken_summary_reports_its_line():
+    text = SUMMARY_HYPER.read_text(encoding="utf-8").replace("Buy-in: $2.76+$0.24", "Buy-in: ???")
+    with pytest.raises(ValueError) as info:
+        parser.parse_summary(text)
+    assert getattr(info.value, "line", None) == 2
+
+
+def test_import_summaries_feed_tournament_stats(client):
+    files = [
+        ("files", (p.name, p.read_bytes(), "text/plain"))
+        for p in (CLASSIC, HYPER, SUMMARY_CLASSIC, SUMMARY_HYPER)
+    ]
+    report = client.post("/api/imports", files=files).json()["report"]
+    assert report["totals"]["imported"] == 133
+    assert report["totals"]["tournaments"] == 2
+    assert report["totals"]["failed"] == 0 and report["errors"] == []
+    summary_files = [f for f in report["files"] if f["name"].startswith("summary")]
+    assert [(f["site"], f["tournaments"], f["hands"]) for f in summary_files] == [
+        ("ggpoker", 1, 0),
+        ("ggpoker", 1, 0),
+    ]
+
+    stats = client.get("/api/stats/tournaments").json()
+    assert stats["tournaments"] == 2
+    # Cost 2 + 3 = 5, prize 10.93: ROI is the mean profit over the mean cost.
+    assert stats["roi"]["value"] == pytest.approx((10.93 - 5) / 2 / 2.5 * 100)
+    assert stats["itm"]["value"] == pytest.approx(50)
+
+    again = client.post("/api/imports", files=files).json()["report"]
+    assert again["totals"]["tournaments"] == 2
+    assert client.get("/api/stats/tournaments").json()["tournaments"] == 2

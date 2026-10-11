@@ -35,7 +35,7 @@ describe('HistoryPage', () => {
             id: 1,
             created_at: '2026-01-01T00:00:00Z',
             report: {
-              totals: { files: 1, hands_found: 3, imported: 1, duplicates: 1, failed: 1 },
+              totals: { files: 1, hands_found: 3, imported: 1, duplicates: 1, failed: 1, tournaments: 2 },
               files: [],
               errors: [{ file: 'a.txt', message: 'Línea rara', hand: 3, line: 40, excerpt: 'xx' }],
               errors_truncated: false,
@@ -56,6 +56,7 @@ describe('HistoryPage', () => {
     expect(
       await screen.findByText((_, el) => el?.tagName === 'P' && /^1 manos importadas de 3/.test(el.textContent ?? '')),
     ).toBeInTheDocument()
+    expect(screen.getByText(/1 con error · 2 resumen\(es\) de torneo/)).toBeInTheDocument()
     expect(screen.getByText(/mano 3 · línea 40/)).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Ver mano 1' }))
     expect(onOpen).toHaveBeenCalledWith(7)

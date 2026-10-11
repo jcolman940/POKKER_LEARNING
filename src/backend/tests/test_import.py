@@ -48,6 +48,7 @@ def test_import_is_idempotent_and_reports_failures(client, fake_room):
         "imported": 2,
         "duplicates": 1,
         "failed": 1,
+        "tournaments": 0,
     }
     err = report["errors"][0]
     assert err["hand"] == 3 and "JSON inválido" in err["message"]

@@ -12,6 +12,10 @@ Format notes (from the samples in tests/fixtures/hand_histories/ggpoker):
 - "*** SHOWDOWN ***" appears in every hand; side pots give one "collected" line
   per pot, so a player can collect several times.
 - Times are the player's local time.
+
+Tournament summaries (separate files from PokerCraft) start with
+"Tournament #...", give the buy-in as "$prize-pool+$fee", the entrants, the start
+time and "You finished the tournament in Nth place" / "You received a total of $X".
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ from datetime import UTC, datetime
 
 from app.domain.hand import Action, ActionType, HandRecord, Seat, TournamentInfo
 from app.domain.scenario import GameFormat, Street
-from app.parsers.base import HandHistoryParser, ParseError, RawHand, split_on
+from app.parsers.base import HandHistoryParser, ParseError, RawHand, TournamentSummary, split_on
 
 HAND_START = re.compile(r"^Poker Hand #\S+: ")
 HEADER = re.compile(
@@ -52,6 +56,15 @@ BOARD = re.compile(r"^Board \[(?P<cards>[^\]]*)\]$")
 SUMMARY_SHOWED = re.compile(r"^Seat \d+: (?P<name>.+?)(?: \([^)]*\))? showed \[(?P<cards>[^\]]+)\]")
 BUY_IN = re.compile(r"\$(?P<amount>[\d,.]+)")
 
+SUMMARY_HEADER = re.compile(r"^Tournament #(?P<tid>\d+), (?P<name>.+), Hold'em No Limit$")
+SUMMARY_BUY_IN = re.compile(r"^Buy-in: \$(?P<buy_in>[\d,.]+)\+\$(?P<fee>[\d,.]+)$")
+SUMMARY_PLAYERS = re.compile(r"^(?P<n>[\d,]+) Players$")
+SUMMARY_STARTED = re.compile(
+    r"^Tournament started (?P<date>\d{4}/\d{2}/\d{2} \d{1,2}:\d{2}:\d{2})$"
+)
+SUMMARY_FINISH = re.compile(r"^You finished the tournament in (?P<n>\d+)\w* place\.$")
+SUMMARY_PRIZE = re.compile(r"^You received a total of \$(?P<amount>[\d,.]+)\.$")
+
 POSTS = {
     "posts the ante": ActionType.POST_ANTE,
     "posts small blind": ActionType.POST_SB,
@@ -68,6 +81,11 @@ def _num(text: str) -> float:
 
 def _cards(text: str) -> str:
     return text.replace(" ", "")
+
+
+def _local_time(text: str) -> datetime:
+    """GG writes the player's local time; store it in UTC."""
+    return datetime.strptime(text, "%Y/%m/%d %H:%M:%S").astimezone().astimezone(UTC)
 
 
 def _format(name: str) -> GameFormat:
@@ -200,11 +218,10 @@ class GGPokerParser(HandHistoryParser):
 
         name = header["name"]
         buy_in = BUY_IN.search(name)
-        played_at = datetime.strptime(header["date"], "%Y/%m/%d %H:%M:%S").astimezone()
         return HandRecord(
             site=self.site,
             hand_id=header["id"],
-            played_at=played_at.astimezone(UTC),
+            played_at=_local_time(header["date"]),
             game_type=_format(name),
             table_name=table["name"],
             max_seats=int(table["max"]),
@@ -226,4 +243,37 @@ class GGPokerParser(HandHistoryParser):
             shown=shown,
             collected=collected,
             rake=rake,
+        )
+
+    def parse_summary(self, text: str) -> TournamentSummary | None:
+        lines = [line.strip() for line in text.strip().splitlines()]
+        header = SUMMARY_HEADER.match(lines[0]) if lines else None
+        if header is None:
+            return None
+        buy_in = SUMMARY_BUY_IN.match(lines[1]) if len(lines) > 1 else None
+        if buy_in is None:
+            raise ParseError("Inscripción del torneo no reconocida", line=2)
+        found: dict[str, re.Match[str]] = {}
+        for line in lines[2:]:
+            for key, pattern in (
+                ("players", SUMMARY_PLAYERS),
+                ("started", SUMMARY_STARTED),
+                ("finish", SUMMARY_FINISH),
+                ("prize", SUMMARY_PRIZE),
+            ):
+                if m := pattern.match(line):
+                    found[key] = m
+        if "started" not in found:
+            raise ParseError("Falta la hora de inicio del torneo")
+        return TournamentSummary(
+            site=self.site,
+            tournament_id=header["tid"],
+            game_type=_format(header["name"]),
+            played_at=_local_time(found["started"]["date"]),
+            buy_in=_num(buy_in["buy_in"]),
+            fee=_num(buy_in["fee"]),
+            prize=_num(found["prize"]["amount"]) if "prize" in found else 0.0,
+            finish=int(found["finish"]["n"]) if "finish" in found else None,
+            entrants=int(found["players"]["n"].replace(",", "")) if "players" in found else None,
+            currency="USD",
         )

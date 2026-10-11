@@ -73,7 +73,7 @@ export function HistoryPage({ onOpen }: { onOpen: (handId: number) => void }) {
         <p className="small muted">
           Salas soportadas:{' '}
           {rooms === null ? '…' : rooms.length ? rooms.map((r) => r.label).join(', ') : 'ninguna todavía'}
-          . Se aceptan archivos .txt y .zip; las manos repetidas se ignoran.
+          . Se aceptan archivos .txt y .zip, con manos o resúmenes de torneo; las manos repetidas se ignoran.
         </p>
         <label className="file-button">
           {busy ? 'Importando…' : 'Elegir archivos'}
@@ -98,6 +98,7 @@ export function HistoryPage({ onOpen }: { onOpen: (handId: number) => void }) {
             <p>
               <strong>{totals.imported}</strong> manos importadas de {totals.hands_found} encontradas en{' '}
               {totals.files} archivo(s) · {totals.duplicates} repetidas · {totals.failed} con error
+              {totals.tournaments ? ` · ${totals.tournaments} resumen(es) de torneo` : ''}
             </p>
             {report.report.errors.length > 0 && (
               <details open={totals.imported === 0}>

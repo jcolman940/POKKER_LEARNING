@@ -1,7 +1,7 @@
 import type { ScenarioInput } from '../simulator/types'
 
 export interface ImportReport {
-  totals: { files: number; hands_found: number; imported: number; duplicates: number; failed: number }
+  totals: { files: number; hands_found: number; imported: number; duplicates: number; failed: number; tournaments?: number }
   files: { name: string; site: string | null; hands: number; imported: number; duplicates: number; failed: number }[]
   errors: { file: string; message: string; hand: number | null; line: number | null; excerpt: string | null }[]
   errors_truncated: boolean

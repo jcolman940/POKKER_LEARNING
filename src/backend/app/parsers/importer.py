@@ -1,6 +1,7 @@
 """Importing hand history files (.txt or .zip) into the database.
 
-- Each file is matched to a room parser by content.
+- Each file is matched to a room parser by content. Tournament summary files
+  save Hero's result (buy-in, finish, prize) instead of hands.
 - Import is idempotent: hands are deduplicated by (site, hand_id), against the
   database and within the same batch.
 - A hand that fails to parse never aborts the batch: it is listed in the report
@@ -21,7 +22,7 @@ from app.config import get_settings
 from app.db.models import Hand, ImportBatch, TournamentResult
 from app.domain.hand import HandRecord
 from app.parsers.base import ParseError, RawHand
-from app.parsers.registry import detect_parser
+from app.parsers.registry import detect_parser, registered_parsers
 from app.stats.decisions import decision_rows
 from app.stats.facts import hero_facts
 
@@ -47,6 +48,7 @@ class FileReport:
     imported: int = 0
     duplicates: int = 0
     failed: int = 0
+    tournaments: int = 0  # tournament summaries read
 
 
 @dataclass
@@ -63,6 +65,7 @@ class ImportReport:
             "imported": sum(f.imported for f in self.files),
             "duplicates": sum(f.duplicates for f in self.files),
             "failed": sum(f.failed for f in self.files),
+            "tournaments": sum(f.tournaments for f in self.files),
         }
 
     def add_error(self, error: ImportIssue) -> None:
@@ -156,15 +159,23 @@ def hand_row(record: HandRecord, raw_text: str, import_id: int | None) -> Hand:
     return row
 
 
+def _save_result(session: Session, site: str, tournament_id: str, values: dict) -> None:
+    existing = session.scalar(
+        select(TournamentResult).where(
+            TournamentResult.site == site, TournamentResult.tournament_id == tournament_id
+        )
+    )
+    if existing:
+        for k, v in values.items():
+            setattr(existing, k, v)
+    else:
+        session.add(TournamentResult(site=site, tournament_id=tournament_id, **values))
+
+
 def _tournament_result(session: Session, record: HandRecord) -> None:
     t = record.tournament
     if t is None or t.finish is None or t.buy_in is None:
         return
-    existing = session.scalar(
-        select(TournamentResult).where(
-            TournamentResult.site == record.site, TournamentResult.tournament_id == t.tournament_id
-        )
-    )
     values = dict(
         game_type=record.game_type.value,
         played_at=record.played_at,
@@ -174,11 +185,46 @@ def _tournament_result(session: Session, record: HandRecord) -> None:
         finish=t.finish,
         currency=t.currency,
     )
-    if existing:
-        for k, v in values.items():
-            setattr(existing, k, v)
-    else:
-        session.add(TournamentResult(site=record.site, tournament_id=t.tournament_id, **values))
+    _save_result(session, record.site, t.tournament_id, values)
+
+
+def _import_summary(
+    session: Session, name: str, text: str, file_report: FileReport, report: ImportReport
+) -> bool:
+    """Saves the result when the file is a tournament summary. True when it was one."""
+    for parser in registered_parsers():
+        try:
+            summary = parser.parse_summary(text)
+        except (ParseError, ValueError) as e:
+            file_report.site = parser.site
+            file_report.failed += 1
+            line = getattr(e, "line", None)
+            report.add_error(
+                ImportIssue(
+                    file=name,
+                    line=line,
+                    message=str(e).splitlines()[0][:300],
+                    excerpt=text.strip().splitlines()[line - 1][:200] if line else None,
+                )
+            )
+            return True
+        if summary is None:
+            continue
+        file_report.site = summary.site
+        values = dict(
+            game_type=summary.game_type.value,
+            played_at=summary.played_at,
+            buy_in=summary.buy_in,
+            fee=summary.fee,
+            prize=summary.prize,
+            finish=summary.finish,
+            entrants=summary.entrants,
+            currency=summary.currency,
+        )
+        _save_result(session, summary.site, summary.tournament_id, values)
+        file_report.tournaments = 1
+        return True
+    return False
 
 
 def import_files(
@@ -193,6 +239,8 @@ def import_files(
     for name, text in expand_files(files, report):
         file_report = FileReport(name=name)
         report.files.append(file_report)
+        if _import_summary(session, name, text, file_report, report):
+            continue
         parser = detect_parser(text)
         if parser is None:
             report.add_error(

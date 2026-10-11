@@ -125,8 +125,9 @@ Salida común de la recomendación: acciones con frecuencia (y EV cuando la fuen
   (un parser por sala en `src/backend/app/parsers/`), idempotente por (sala, id de mano), tolerante a errores
   con reporte de archivo/mano/línea. **Los parsers se escriben contra archivos reales de muestra**
   (`tests/fixtures/hand_histories/`). Soportado: **GGPoker torneos** (MTT; la hora de cada mano se toma
-  como hora local de la PC). Pendientes hasta tener muestras: PokerStars y GGPoker cash. Los historiales de
-  GG no traen inscripción, puesto ni premio, así que ROI e ITM necesitan los resúmenes de torneo.
+  como hora local de la PC). Pendientes hasta tener muestras: PokerStars y GGPoker cash. Los resúmenes de torneo de
+  GG (PokerCraft) se importan igual que las manos y cargan inscripción, puesto, premio y jugadores, que
+  alimentan ROI e ITM.
 - **Modelo normalizado** `HandRecord` (`src/backend/app/domain/hand.py`): lo producen los parsers y lo consumen
   estadísticas, replayer y entrenador/leak finder (fase 6).
 - **Estadísticas** (`/api/stats`): VPIP, PFR, 3-bet, fold to 3-bet, c-bet flop/turn, fold to c-bet, WTSD, W$SD,
